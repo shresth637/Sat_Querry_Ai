@@ -132,6 +132,24 @@ elif mode_selection == "Bi-Temporal Pair":
             slots.append(SlotAssignment(slot_id="t1", file_path=str(p1)))
             slot_files["t1"] = p1
 
+    st.markdown("##### ⚙️ Change Detection Parameters")
+    cd_col1, cd_col2, cd_col3 = st.columns(3)
+    with cd_col1:
+        change_threshold = st.slider(
+            "Change Threshold:",
+            min_value=0.05,
+            max_value=0.95,
+            value=0.50,
+            step=0.05,
+            help="Probability cutoff for classifying a pixel as changed (default 0.50).",
+        )
+    with cd_col2:
+        st.markdown("**Tiled Inference:** 256×256 tiles")
+        st.caption("Sliding-window with cosine blending (no downsampling)")
+    with cd_col3:
+        st.markdown("**Tile Overlap:** 25% (64 px)")
+        st.caption("Seamless reconstruction without boundary seams")
+
 else:  # Optical + SAR Pair
     input_mode = InputMode.I3_OPTICAL_SAR_PAIR
     with col_in1:
@@ -252,11 +270,16 @@ if run_button:
         st.error("Please enter a natural-language query or select an example above.")
     else:
         controller = AgentController()
+        analysis_kwargs = {}
+        if mode_selection == "Bi-Temporal Pair":
+            analysis_kwargs["change_threshold"] = change_threshold
+
         with st.spinner("Agent interpreting query, validating compatibility, and planning specialist execution..."):
             result: AnalysisResult = controller.analyze(
                 query=query_text.strip(),
                 slots=slots,
                 input_mode=input_mode,
+                **analysis_kwargs,
             )
             st.session_state.last_result = result
             st.session_state.history.append({
@@ -309,27 +332,134 @@ if result:
     else:
         st.success(result.result_text)
 
-        # Display dedicated Change Statistics if present
+        # Display dedicated Change Detection Model & Results if present
         stats_ev = next((e for e in result.evidence if e.evidence_type.value == "statistics"), None)
         if stats_ev and stats_ev.data:
-            st.markdown("#### 📊 Change Detection Statistics")
             s_data = stats_ev.data
-            m_col1, m_col2, m_col3, m_col4 = st.columns(4)
-            with m_col1:
-                st.metric("Changed Pixels", f"{s_data.get('changed_pixels', 0):,}")
-            with m_col2:
-                st.metric("Total Pixels", f"{s_data.get('total_pixels', 0):,}")
-            with m_col3:
-                st.metric("Percentage Changed", f"{s_data.get('percentage_changed', 0.0)}%")
-            with m_col4:
-                if s_data.get("changed_area_sq_m") is not None:
-                    st.metric("Changed Area", f"{s_data.get('changed_area_sq_m', 0.0):,.1f} m² ({s_data.get('changed_area_ha', 0.0):.2f} ha)")
-                else:
-                    st.metric("Unchanged Pixels", f"{s_data.get('unchanged_pixels', 0):,}")
 
-    # 6. VISUAL EVIDENCE
-    st.header("6. Visual Evidence")
-    if result.evidence:
+            st.markdown("#### 🛰️ Specialist Model Specifications")
+            m_spec1, m_spec2, m_spec3, m_spec4, m_spec5, m_spec6 = st.columns(6)
+            with m_spec1:
+                st.metric("Model", "Open-CD BIT")
+            with m_spec2:
+                st.metric("Version", "r18-levir")
+            with m_spec3:
+                st.metric("Device", s_data.get("inference_device", "cpu").upper())
+            with m_spec4:
+                st.metric("Threshold", f"{s_data.get('change_threshold', 0.5):.2f}")
+            with m_spec5:
+                st.metric("Tile Size", f"{s_data.get('tile_size', 256)}×{s_data.get('tile_size', 256)}")
+            with m_spec6:
+                st.metric("Overlap", f"{int(s_data.get('tile_overlap', 0.25)*100)}%")
+
+            st.markdown("#### 📊 Change Detection Results")
+            r_col1, r_col2, r_col3, r_col4, r_col5 = st.columns(5)
+            with r_col1:
+                if s_data.get("changed_area_m2") is not None:
+                    st.metric("Changed Area", f"{s_data.get('changed_area_hectares', 0.0):,.2f} ha", help=f"{s_data.get('changed_area_m2', 0):,.1f} m²")
+                else:
+                    st.metric("Changed Area", "N/A (Unprojected)")
+            with r_col2:
+                st.metric("Change %", f"{s_data.get('percentage_changed', 0.0)}%")
+            with r_col3:
+                st.metric("Changed Pixels", f"{s_data.get('changed_pixels', 0):,}")
+            with r_col4:
+                st.metric("Confidence", f"{result.confidence.score*100:.1f}%" if result.confidence.score is not None else "N/A")
+            with r_col5:
+                t_total = s_data.get("timings_seconds", {}).get("total")
+                st.metric("Processing Time", f"{t_total:.2f}s" if t_total is not None else "N/A")
+
+    # 6. VISUAL EVIDENCE & DOWNLOADS
+    st.header("6. Visual Evidence & Artifacts")
+    
+    # Check if this run generated change detection artifacts
+    mask_art = next((e for e in result.evidence if "Binary Change Mask" in e.title), None)
+    prob_art = next((e for e in result.evidence if "Probability" in e.title), None)
+    vis_art = next((e for e in result.evidence if "Overlay" in e.title or "Visualization" in e.title), None)
+    stats_ev = next((e for e in result.evidence if e.evidence_type.value == "statistics"), None)
+
+    if mask_art or prob_art or vis_art:
+        tab_t0, tab_t1, tab_prob, tab_mask, tab_overlay = st.tabs([
+            "📷 T0 Image",
+            "📷 T1 Image",
+            "🌐 Change Probability",
+            "⬛⬜ Binary Change Map",
+            "🔴 Change Overlay",
+        ])
+
+        with tab_t0:
+            if "t0" in slot_files and slot_files["t0"].exists():
+                img_t0, _ = generate_preview_image(slot_files["t0"], max_side=600)
+                if img_t0:
+                    st.image(img_t0, caption="Date T0 ('Before') Image", use_container_width=True)
+
+        with tab_t1:
+            if "t1" in slot_files and slot_files["t1"].exists():
+                img_t1, _ = generate_preview_image(slot_files["t1"], max_side=600)
+                if img_t1:
+                    st.image(img_t1, caption="Date T1 ('After') Image", use_container_width=True)
+
+        with tab_prob:
+            if prob_art and prob_art.file_path and Path(prob_art.file_path).exists():
+                p_img, _ = generate_preview_image(prob_art.file_path, max_side=600)
+                if p_img:
+                    st.image(p_img, caption="Continuous Change Probability Map (0.0 to 1.0)", use_container_width=True)
+
+        with tab_mask:
+            if mask_art and mask_art.file_path and Path(mask_art.file_path).exists():
+                m_img, _ = generate_preview_image(mask_art.file_path, max_side=600)
+                if m_img:
+                    st.image(m_img, caption="Georeferenced Binary Change Mask (0 = Unchanged, 1 = Changed)", use_container_width=True)
+
+        with tab_overlay:
+            if vis_art and vis_art.file_path and Path(vis_art.file_path).exists():
+                o_img, _ = generate_preview_image(vis_art.file_path, max_side=600)
+                if o_img:
+                    st.image(o_img, caption="Visual Overlay: Changed Regions Highlighted in Red", use_container_width=True)
+
+        st.markdown("#### 📥 Download Artifacts")
+        dl_col1, dl_col2, dl_col3, dl_col4 = st.columns(4)
+        with dl_col1:
+            if mask_art and mask_art.file_path and Path(mask_art.file_path).exists():
+                with open(mask_art.file_path, "rb") as f_mask:
+                    st.download_button(
+                        "⬇️ Binary Mask (GeoTIFF)",
+                        f_mask.read(),
+                        file_name=Path(mask_art.file_path).name,
+                        mime="image/tiff",
+                        use_container_width=True,
+                    )
+        with dl_col2:
+            if prob_art and prob_art.file_path and Path(prob_art.file_path).exists():
+                with open(prob_art.file_path, "rb") as f_prob:
+                    st.download_button(
+                        "⬇️ Probability Map (GeoTIFF)",
+                        f_prob.read(),
+                        file_name=Path(prob_art.file_path).name,
+                        mime="image/tiff",
+                        use_container_width=True,
+                    )
+        with dl_col3:
+            if stats_ev and stats_ev.data:
+                stats_json_str = json.dumps(stats_ev.data, indent=2)
+                st.download_button(
+                    "⬇️ Statistics (JSON)",
+                    stats_json_str,
+                    file_name="change_statistics.json",
+                    mime="application/json",
+                    use_container_width=True,
+                )
+        with dl_col4:
+            if vis_art and vis_art.file_path and Path(vis_art.file_path).exists():
+                with open(vis_art.file_path, "rb") as f_vis:
+                    st.download_button(
+                        "⬇️ Overlay (PNG)",
+                        f_vis.read(),
+                        file_name=Path(vis_art.file_path).name,
+                        mime="image/png",
+                        use_container_width=True,
+                    )
+    elif result.evidence:
         ev_cols = st.columns(min(len(result.evidence), 4))
         for i, ev in enumerate(result.evidence):
             with ev_cols[i % len(ev_cols)]:

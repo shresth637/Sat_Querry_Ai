@@ -73,14 +73,21 @@ class ModelRegistry:
                 module_name, class_name = adapter_path.rsplit(".", 1)
                 mod = importlib.import_module(module_name)
                 adapter_cls = getattr(mod, class_name)
+                init_kwargs = {}
                 weights_path = entry.get("weights_path")
+                if weights_path:
+                    init_kwargs["weights_path"] = weights_path
+                for param in ["tile_size", "tile_overlap", "change_threshold", "batch_size", "device"]:
+                    if param in entry:
+                        init_kwargs[param] = entry[param]
+
                 try:
-                    if weights_path:
-                        adapter_inst = adapter_cls(weights_path=weights_path)
-                    else:
-                        adapter_inst = adapter_cls()
+                    adapter_inst = adapter_cls(**init_kwargs)
                 except TypeError:
-                    adapter_inst = adapter_cls()
+                    try:
+                        adapter_inst = adapter_cls(weights_path=weights_path) if weights_path else adapter_cls()
+                    except TypeError:
+                        adapter_inst = adapter_cls()
 
                 registry.register(model_id=mid, adapter=adapter_inst, enabled=enabled, metadata=entry)
             except Exception:

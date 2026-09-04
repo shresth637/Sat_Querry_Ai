@@ -36,7 +36,12 @@ models:
     adapter: satquery.models.opencd_bit.OpenCDBITModel
     enabled: true
     weights_path: models/checkpoints/bit_r18_256x256_40k_levircd.pth
-    notes: Pretrained Open-CD BIT model on LEVIR-CD.
+    tile_size: 256
+    tile_overlap: 0.25
+    change_threshold: 0.5
+    batch_size: 4
+    device: auto
+    notes: Pretrained Open-CD BIT model on LEVIR-CD with tiled sliding-window inference.
 
   - id: cdvqa_baseline
     name: CDVQA baseline

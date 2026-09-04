@@ -48,6 +48,7 @@ class AgentController:
         slots: list[SlotAssignment],
         input_mode: InputMode,
         allow_png_jpeg: bool = False,
+        **kwargs: Any,
     ) -> AnalysisResult:
         tracer = Tracer()
         uncertainties: list[str] = []
@@ -156,7 +157,7 @@ class AgentController:
                         "metas": metas,
                     }
 
-                    model_result = active_adapter.predict(inputs_dict)
+                    model_result = active_adapter.predict(inputs_dict, **kwargs)
                     if model_result.status == "success":
                         result_text = model_result.text or "Change detection analysis completed."
                     else:
@@ -192,6 +193,15 @@ class AgentController:
                                 description="Georeferenced binary change map preserving original raster bounds and CRS",
                             )
                         )
+                    elif art_type == "change_prob_geotiff":
+                        evidence_items.append(
+                            create_change_map_evidence(
+                                title="Change Probability Map (GeoTIFF)",
+                                file_path=artifact.get("path"),
+                                crs=artifact.get("crs"),
+                                description="Continuous float32 change probability map in [0, 1] at native raster resolution",
+                            )
+                        )
                     elif art_type == "change_visualization":
                         evidence_items.append(
                             create_preview_evidence(
@@ -215,8 +225,8 @@ class AgentController:
                     score=model_result.raw_scores["confidence_score"],
                     source="model",
                     method="bit_softmax_mean_confidence",
-                    signals_used=["softmax_probabilities", "prediction_margin"],
-                    reason="Mean class-assignment probability derived from Open-CD BIT output layer",
+                    signals_used=["softmax_probabilities", "prediction_margin", "sliding_window_probabilities"],
+                    reason="Mean prediction confidence derived from Open-CD BIT output layer across all sliding window tiles",
                 )
             else:
                 confidence = build_confidence_report(
