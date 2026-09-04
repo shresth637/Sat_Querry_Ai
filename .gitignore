@@ -1,0 +1,43 @@
+﻿# Environment
+.venv/
+env/
+venv/
+ENV/
+
+# Python cache & build
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Secrets and local config
+.env
+.env.local
+*.local
+
+# Model weights and checkpoints
+models/
+*.pth
+*.pt
+*.bin
+*.safetensors
+*.onnx
+*.engine
+
+# Generated data and outputs
+data/
+outputs/
+*.log
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.tmp

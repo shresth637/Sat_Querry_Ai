@@ -1,0 +1,18 @@
+application_name: SatQuery AI
+environment: development
+device: cpu
+model_directory: ./models
+data_directory: ./data
+output_directory: ./outputs
+logging_level: INFO
+allow_png_jpeg_benchmark: false
+max_upload_mb: 512
+preview_max_side: 512
+png_jpeg_policy: reject_unless_benchmark_flag
+
+enabled_models: []
+enabled_tools:
+  - geotiff_reader
+  - image_preprocessing
+  - visualization
+  - change_map_generation
