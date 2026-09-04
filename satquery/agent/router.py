@@ -1,4 +1,4 @@
-﻿import re
+import re
 from typing import Optional
 
 from satquery.domain.schemas import (
@@ -90,25 +90,43 @@ def route_query(
 
     # 3. Bi-temporal change detection patterns
     change_detect_phrases = [
-        "what changed", "where did the change occur", "where did change occur",
+        "what changed", "what changed between", "where did the change occur", "where did change occur",
         "detect change", "change between these two", "changed between",
         "differences between", "difference between these two",
         "find changes", "map changes", "change occurred",
+        "where are the changed buildings", "where are the changed", "changed buildings",
+        "show me areas where construction happened", "construction happened", "areas where construction",
+        "how much of the area changed", "how much changed",
+        "compare these two satellite images", "compare these two", "compare the images",
+        "compare images", "bitemporal change", "temporal change",
     ]
     is_change_detect_query = any(phrase in q_lower for phrase in change_detect_phrases)
+
+    # If bitemporal input mode is selected, check for general change/difference/comparison concepts
+    if input_mode == InputMode.I4_BITEMPORAL_PAIR and not is_change_detect_query and not is_change_vqa_query:
+        bitemporal_keywords = [
+            "change", "changed", "construction", "difference", "differences",
+            "compare", "growth", "expansion", "before and after", "new buildings",
+            "development", "modification",
+        ]
+        if any(re.search(r"\b" + re.escape(kw) + r"\b", q_lower) for kw in bitemporal_keywords):
+            is_change_detect_query = True
 
     # 4. Grounding patterns
     grounding_phrases = [
         "highlight", "locate", "detect the", "bounding box", "find the",
         "pinpoint", "where is the", "outline", "box the",
     ]
-    is_grounding_query = any(phrase in q_lower for phrase in grounding_phrases)
+    # Do not treat "where are the changed buildings" as grounding when change detect is matched
+    is_grounding_query = any(phrase in q_lower for phrase in grounding_phrases) and not is_change_detect_query
 
     # 5. Captioning patterns
     caption_phrases = [
         "describe", "caption", "overview of", "summary of the scene",
         "what does this image show", "describe the land-cover",
         "describe the scene", "generate a caption",
+        "what is visible in this satellite image", "what is visible in this",
+        "what is visible",
     ]
     is_caption_query = any(phrase in q_lower for phrase in caption_phrases)
 

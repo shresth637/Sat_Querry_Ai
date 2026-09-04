@@ -210,6 +210,26 @@ class AgentController:
                                 description="Visual representation of detected change (red = changed)",
                             )
                         )
+                    elif art_type == "change_regions_visualization":
+                        evidence_items.append(
+                            create_preview_evidence(
+                                file_path=artifact.get("path"),
+                                title="Change Regions with Bounding Boxes",
+                                description="Visual overlay identifying individual contiguous change regions and ranking badges",
+                            )
+                        )
+                    elif art_type == "change_regions_geojson":
+                        from satquery.domain.schemas import Evidence, EvidenceType
+                        evidence_items.append(
+                            Evidence(
+                                evidence_type=EvidenceType.CHANGE_MAP,
+                                title="Change Regions Vector Map (GeoJSON)",
+                                file_path=artifact.get("path"),
+                                data=artifact.get("data"),
+                                crs=artifact.get("crs"),
+                                description="RFC 7946 GeoJSON FeatureCollection of significant connected change regions with bounding boxes and metrics",
+                            )
+                        )
                     elif art_type == "change_statistics":
                         evidence_items.append(
                             create_statistics_evidence(

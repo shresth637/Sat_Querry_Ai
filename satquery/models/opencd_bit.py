@@ -4,6 +4,7 @@ import math
 from pathlib import Path
 import time
 from typing import Any, Optional, Union
+import uuid
 import numpy as np
 from PIL import Image
 import rasterio
@@ -15,6 +16,8 @@ import torch.nn.functional as F
 from satquery.domain.schemas import ModelResult
 from satquery.models.base import ModelAdapter
 from satquery.models.geospatial import calculate_raster_area, validate_bitemporal_rasters
+from satquery.models.interpreter import format_change_detection_summary
+from satquery.models.regions import extract_change_regions, render_labeled_region_overlay
 from satquery.models.tiling import TiledInferenceEngine
 
 logger = logging.getLogger(__name__)
@@ -266,6 +269,8 @@ class OpenCDBITModel(ModelAdapter):
         tile_overlap: float = 0.25,
         change_threshold: float = 0.5,
         batch_size: int = 4,
+        min_change_region_pixels: int = 20,
+        max_regions_visualized: int = 20,
     ) -> None:
         super().__init__(
             name="Open-CD BIT ResNet-18",
@@ -289,6 +294,8 @@ class OpenCDBITModel(ModelAdapter):
         self.tile_overlap = float(tile_overlap)
         self.change_threshold = float(change_threshold)
         self.batch_size = int(batch_size)
+        self.min_change_region_pixels = int(min_change_region_pixels)
+        self.max_regions_visualized = int(max_regions_visualized)
 
         self.model: Optional[BITNet] = None
         self.output_dir = Path("outputs/change_maps")
@@ -430,6 +437,8 @@ class OpenCDBITModel(ModelAdapter):
         tile_sz = int(kwargs.get("tile_size", self.tile_size))
         overlap = float(kwargs.get("tile_overlap", self.tile_overlap))
         batch_sz = int(kwargs.get("batch_size", self.batch_size))
+        min_region_px = int(kwargs.get("min_change_region_pixels", self.min_change_region_pixels))
+        max_regions_vis = int(kwargs.get("max_regions_visualized", self.max_regions_visualized))
 
         # 2. Strict Geospatial & Input Validation
         try:
@@ -468,12 +477,15 @@ class OpenCDBITModel(ModelAdapter):
             # Binary change mask derived from configured threshold
             binary_mask = (prob_map >= threshold).astype(np.uint8)
 
-            run_id = f"cd_{int(time.time())}"
+            run_id = f"run_{int(time.time())}_{uuid.uuid4().hex[:6]}"
+            run_dir = self.output_dir / run_id
+            run_dir.mkdir(parents=True, exist_ok=True)
+
             crs_val = meta0["crs"]
             transform_val = meta0["transform"]
 
             # A. Binary Change Mask GeoTIFF
-            mask_geotiff_path = self.output_dir / f"{run_id}_change_mask.tif"
+            mask_geotiff_path = run_dir / "change_mask.tif"
             with rasterio.open(
                 mask_geotiff_path,
                 "w",
@@ -488,7 +500,7 @@ class OpenCDBITModel(ModelAdapter):
                 dst.write(binary_mask, 1)
 
             # B. Change Probability GeoTIFF
-            prob_geotiff_path = self.output_dir / f"{run_id}_change_prob.tif"
+            prob_geotiff_path = run_dir / "change_prob.tif"
             with rasterio.open(
                 prob_geotiff_path,
                 "w",
@@ -503,7 +515,7 @@ class OpenCDBITModel(ModelAdapter):
                 dst.write(prob_map.astype(np.float32), 1)
 
             # C. Visual Change Overlay PNG (Red highlight on T1 imagery)
-            vis_png_path = self.output_dir / f"{run_id}_change_vis.png"
+            vis_png_path = run_dir / "change_overlay.png"
             vis_img = np.copy(rgb1)
             # Alpha blend changed pixels with bright red (255, 30, 30)
             changed_mask_bool = binary_mask == 1
@@ -513,6 +525,28 @@ class OpenCDBITModel(ModelAdapter):
                 vis_img[changed_mask_bool, 1] = np.clip(vis_img[changed_mask_bool, 1] * (1 - alpha) + 30 * alpha, 0, 255).astype(np.uint8)
                 vis_img[changed_mask_bool, 2] = np.clip(vis_img[changed_mask_bool, 2] * (1 - alpha) + 30 * alpha, 0, 255).astype(np.uint8)
             Image.fromarray(vis_img).save(vis_png_path)
+
+            # D. Spatial Change Region Extraction & RFC 7946 GeoJSON
+            regions, geojson_data, concentration_desc = extract_change_regions(
+                binary_mask=binary_mask,
+                prob_map=prob_map,
+                meta=meta0,
+                min_region_pixels=min_region_px,
+            )
+
+            geojson_path = run_dir / "change_regions.geojson"
+            with open(geojson_path, "w", encoding="utf-8") as f_geo:
+                json.dump(geojson_data, f_geo, indent=2)
+
+            # E. Labeled Change Regions Visualization (Bounding boxes & badges)
+            regions_vis_path = run_dir / "change_regions_vis.png"
+            labeled_img = render_labeled_region_overlay(
+                rgb_image=rgb1,
+                binary_mask=binary_mask,
+                regions=regions,
+                max_labels=max_regions_vis,
+            )
+            labeled_img.save(regions_vis_path)
 
             # 6. Physical Area Calculation
             total_px = int(orig_w * orig_h)
@@ -543,8 +577,10 @@ class OpenCDBITModel(ModelAdapter):
             t_post = time.perf_counter() - t_post_start
             t_total = time.perf_counter() - t_start
 
-            # D. Comprehensive Statistics Dictionary & JSON
+            # F. Comprehensive Statistics Dictionary & JSON
             stats = {
+                "run_id": run_id,
+                "run_directory": str(run_dir),
                 "total_pixels": total_px,
                 "changed_pixels": changed_px,
                 "unchanged_pixels": unchanged_px,
@@ -564,6 +600,10 @@ class OpenCDBITModel(ModelAdapter):
                 "changed_area_hectares": area_info["changed_area_hectares"],
                 "changed_area_km2": area_info["changed_area_km2"],
                 "pixel_area_m2": area_info["pixel_area_m2"],
+                "regions_count": len(regions),
+                "min_change_region_pixels": min_region_px,
+                "spatial_concentration": concentration_desc,
+                "top_regions": regions[:5],
                 "tile_size": tile_sz,
                 "tile_overlap": overlap,
                 "total_tiles_evaluated": num_tiles,
@@ -577,27 +617,26 @@ class OpenCDBITModel(ModelAdapter):
                 },
             }
 
-            stats_json_path = self.output_dir / f"{run_id}_stats.json"
+            stats_json_path = run_dir / "stats.json"
             with open(stats_json_path, "w", encoding="utf-8") as f_json:
                 json.dump(stats, f_json, indent=2)
 
-            # Area summary text
-            if area_info["changed_area_m2"] is not None:
-                area_text = (
-                    f" Physical area changed: approximately {area_info['changed_area_m2']:,.1f} m² "
-                    f"({area_info['changed_area_hectares']:,.2f} ha / {area_info['changed_area_km2']:.4f} km²) "
-                    f"via {area_info['area_calculation_method']}."
-                )
-            else:
-                area_text = " (Physical metric area calculation unavailable: missing CRS or resolution)."
-
-            summary_text = (
-                f"Bi-temporal change detection completed via Open-CD BIT (tiled sliding-window inference).\n\n"
-                f"- **Changed Area:** {changed_px:,} pixels ({pct_changed}% of the scene).\n"
-                f"- **Unchanged Area:** {unchanged_px:,} pixels ({pct_unchanged}% of the scene).\n"
-                f"- **Scene Dimensions:** {orig_w}x{orig_h} ({num_tiles} tiles evaluated at {tile_sz}x{tile_sz}).\n"
-                f"- **Selected Threshold:** {threshold:.2f} | **Device:** {self.device_str}.\n"
-                f"- **Geospatial Reference:** CRS {crs_val or 'Not available'}.{area_text}"
+            # G. Structured Natural Language Summary Report
+            artifacts_names = [
+                "change_mask.tif (Binary GeoTIFF)",
+                "change_prob.tif (Probability GeoTIFF)",
+                "change_regions.geojson (Vector Regions)",
+                "change_regions_vis.png (Labeled Region Overlay)",
+                "change_overlay.png (Visual Overlay)",
+                "stats.json (Detailed Statistics)",
+            ]
+            summary_text = format_change_detection_summary(
+                stats=stats,
+                regions=regions,
+                area_info=area_info,
+                crs_str=crs_val,
+                device_str=self.device_str,
+                artifacts_names=artifacts_names,
             )
 
             artifacts = [
@@ -618,6 +657,15 @@ class OpenCDBITModel(ModelAdapter):
                     "path": str(vis_png_path),
                 },
                 {
+                    "type": "change_regions_visualization",
+                    "path": str(regions_vis_path),
+                },
+                {
+                    "type": "change_regions_geojson",
+                    "path": str(geojson_path),
+                    "data": geojson_data,
+                },
+                {
                     "type": "change_statistics",
                     "data": stats,
                     "path": str(stats_json_path),
@@ -636,6 +684,8 @@ class OpenCDBITModel(ModelAdapter):
                 "total_pixels": total_px,
                 "threshold": threshold,
                 "num_tiles": num_tiles,
+                "regions_count": len(regions),
+                "run_id": run_id,
                 "device": self.device_str,
             }
 

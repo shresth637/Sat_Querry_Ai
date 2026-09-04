@@ -133,7 +133,7 @@ elif mode_selection == "Bi-Temporal Pair":
             slot_files["t1"] = p1
 
     st.markdown("##### ⚙️ Change Detection Parameters")
-    cd_col1, cd_col2, cd_col3 = st.columns(3)
+    cd_col1, cd_col2, cd_col3, cd_col4 = st.columns(4)
     with cd_col1:
         change_threshold = st.slider(
             "Change Threshold:",
@@ -144,9 +144,18 @@ elif mode_selection == "Bi-Temporal Pair":
             help="Probability cutoff for classifying a pixel as changed (default 0.50).",
         )
     with cd_col2:
+        min_change_region_pixels = st.slider(
+            "Min Region Size (px):",
+            min_value=5,
+            max_value=200,
+            value=20,
+            step=5,
+            help="Filter out small change noise clusters smaller than this pixel count (default 20 px).",
+        )
+    with cd_col3:
         st.markdown("**Tiled Inference:** 256×256 tiles")
         st.caption("Sliding-window with cosine blending (no downsampling)")
-    with cd_col3:
+    with cd_col4:
         st.markdown("**Tile Overlap:** 25% (64 px)")
         st.caption("Seamless reconstruction without boundary seams")
 
@@ -273,14 +282,24 @@ if run_button:
         analysis_kwargs = {}
         if mode_selection == "Bi-Temporal Pair":
             analysis_kwargs["change_threshold"] = change_threshold
+            analysis_kwargs["min_change_region_pixels"] = min_change_region_pixels
 
-        with st.spinner("Agent interpreting query, validating compatibility, and planning specialist execution..."):
-            result: AnalysisResult = controller.analyze(
-                query=query_text.strip(),
-                slots=slots,
-                input_mode=input_mode,
-                **analysis_kwargs,
-            )
+        try:
+            with st.status("Executing SatQuery AI Analysis...", expanded=True) as status_box:
+                st.write("🔍 Inspecting rasters and validating coordinate reference systems...")
+                time.sleep(0.05)
+                st.write("🧠 Interpreting user query and resolving specialist models...")
+                time.sleep(0.05)
+                st.write("🛰️ Executing neural sliding-window inference and extracting change regions...")
+                result: AnalysisResult = controller.analyze(
+                    query=query_text.strip(),
+                    slots=slots,
+                    input_mode=input_mode,
+                    **analysis_kwargs,
+                )
+                st.write("📊 Finalizing GeoJSON vectors, statistics, and visual overlays...")
+                status_box.update(label="Analysis completed successfully!", state="complete", expanded=False)
+
             st.session_state.last_result = result
             st.session_state.history.append({
                 "query": query_text,
@@ -288,6 +307,8 @@ if run_button:
                 "theme": result.plan.theme.value,
                 "result_text": result.result_text,
             })
+        except Exception as exc:
+            st.error(f"❌ Analysis failed: {str(exc)}")
 
 
 # -------------------------------------------------------------
@@ -330,7 +351,7 @@ if result:
     elif "Validation failed" in result.result_text or "Agent planning stopped" in result.result_text:
         st.error(f"### {result.result_text}")
     else:
-        st.success(result.result_text)
+        st.markdown(result.result_text)
 
         # Display dedicated Change Detection Model & Results if present
         stats_ev = next((e for e in result.evidence if e.evidence_type.value == "statistics"), None)
@@ -362,7 +383,7 @@ if result:
             with r_col2:
                 st.metric("Change %", f"{s_data.get('percentage_changed', 0.0)}%")
             with r_col3:
-                st.metric("Changed Pixels", f"{s_data.get('changed_pixels', 0):,}")
+                st.metric("Change Regions", f"{s_data.get('regions_count', 0):,}")
             with r_col4:
                 st.metric("Confidence", f"{result.confidence.score*100:.1f}%" if result.confidence.score is not None else "N/A")
             with r_col5:
@@ -375,16 +396,19 @@ if result:
     # Check if this run generated change detection artifacts
     mask_art = next((e for e in result.evidence if "Binary Change Mask" in e.title), None)
     prob_art = next((e for e in result.evidence if "Probability" in e.title), None)
-    vis_art = next((e for e in result.evidence if "Overlay" in e.title or "Visualization" in e.title), None)
+    vis_art = next((e for e in result.evidence if e.title == "Change Map Visual Overlay"), None)
+    regions_art = next((e for e in result.evidence if "Bounding Boxes" in e.title), None)
+    geojson_art = next((e for e in result.evidence if "GeoJSON" in e.title), None)
     stats_ev = next((e for e in result.evidence if e.evidence_type.value == "statistics"), None)
 
-    if mask_art or prob_art or vis_art:
-        tab_t0, tab_t1, tab_prob, tab_mask, tab_overlay = st.tabs([
+    if mask_art or prob_art or vis_art or regions_art:
+        tab_t0, tab_t1, tab_prob, tab_mask, tab_overlay, tab_regions = st.tabs([
             "📷 T0 Image",
             "📷 T1 Image",
             "🌐 Change Probability",
             "⬛⬜ Binary Change Map",
             "🔴 Change Overlay",
+            "🏷️ Change Regions",
         ])
 
         with tab_t0:
@@ -417,8 +441,14 @@ if result:
                 if o_img:
                     st.image(o_img, caption="Visual Overlay: Changed Regions Highlighted in Red", use_container_width=True)
 
+        with tab_regions:
+            if regions_art and regions_art.file_path and Path(regions_art.file_path).exists():
+                r_img, _ = generate_preview_image(regions_art.file_path, max_side=600)
+                if r_img:
+                    st.image(r_img, caption="Detected Contiguous Change Regions with Ranking Badges & Bounding Boxes", use_container_width=True)
+
         st.markdown("#### 📥 Download Artifacts")
-        dl_col1, dl_col2, dl_col3, dl_col4 = st.columns(4)
+        dl_col1, dl_col2, dl_col3, dl_col4, dl_col5 = st.columns(5)
         with dl_col1:
             if mask_art and mask_art.file_path and Path(mask_art.file_path).exists():
                 with open(mask_art.file_path, "rb") as f_mask:
@@ -440,6 +470,16 @@ if result:
                         use_container_width=True,
                     )
         with dl_col3:
+            if geojson_art and geojson_art.file_path and Path(geojson_art.file_path).exists():
+                with open(geojson_art.file_path, "rb") as f_geo:
+                    st.download_button(
+                        "⬇️ Regions (GeoJSON)",
+                        f_geo.read(),
+                        file_name=Path(geojson_art.file_path).name,
+                        mime="application/geo+json",
+                        use_container_width=True,
+                    )
+        with dl_col4:
             if stats_ev and stats_ev.data:
                 stats_json_str = json.dumps(stats_ev.data, indent=2)
                 st.download_button(
@@ -449,13 +489,13 @@ if result:
                     mime="application/json",
                     use_container_width=True,
                 )
-        with dl_col4:
-            if vis_art and vis_art.file_path and Path(vis_art.file_path).exists():
-                with open(vis_art.file_path, "rb") as f_vis:
+        with dl_col5:
+            if regions_art and regions_art.file_path and Path(regions_art.file_path).exists():
+                with open(regions_art.file_path, "rb") as f_rvis:
                     st.download_button(
-                        "⬇️ Overlay (PNG)",
-                        f_vis.read(),
-                        file_name=Path(vis_art.file_path).name,
+                        "⬇️ Labeled Regions (PNG)",
+                        f_rvis.read(),
+                        file_name=Path(regions_art.file_path).name,
                         mime="image/png",
                         use_container_width=True,
                     )

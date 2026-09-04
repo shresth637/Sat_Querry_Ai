@@ -40,8 +40,10 @@ models:
     tile_overlap: 0.25
     change_threshold: 0.5
     batch_size: 4
+    min_change_region_pixels: 20
+    max_regions_visualized: 20
     device: auto
-    notes: Pretrained Open-CD BIT model on LEVIR-CD with tiled sliding-window inference.
+    notes: Pretrained Open-CD BIT model on LEVIR-CD with tiled sliding-window inference and region extraction.
 
   - id: cdvqa_baseline
     name: CDVQA baseline

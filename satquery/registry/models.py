@@ -77,7 +77,11 @@ class ModelRegistry:
                 weights_path = entry.get("weights_path")
                 if weights_path:
                     init_kwargs["weights_path"] = weights_path
-                for param in ["tile_size", "tile_overlap", "change_threshold", "batch_size", "device"]:
+                for param in [
+                    "tile_size", "tile_overlap", "change_threshold",
+                    "batch_size", "device", "min_change_region_pixels",
+                    "max_regions_visualized",
+                ]:
                     if param in entry:
                         init_kwargs[param] = entry[param]
 
