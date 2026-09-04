@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 import tempfile
 from typing import Optional
 import streamlit as st
@@ -291,8 +291,13 @@ if result:
         else:
             st.success("✅ **Plan Status:** Compatible")
     with col_p3:
-        st.markdown(f"**Selected Model(s):** {', '.join(plan.selected_models)}")
-        st.caption("Model Status: **NOT_CONFIGURED** (Weights unloaded in Phase 2)")
+        reg = AgentController().model_registry
+        model_statuses = []
+        for mid in plan.selected_models:
+            m = reg.get(mid)
+            st_text = m.status.upper() if m else "UNKNOWN"
+            model_statuses.append(f"`{mid}` ({st_text})")
+        st.markdown(f"**Selected Model(s):** {', '.join(model_statuses)}")
         st.markdown(f"**Selected Tools:** {', '.join(plan.selected_tools)}")
 
     # 5. ANALYSIS RESULT
@@ -302,7 +307,25 @@ if result:
     elif "Validation failed" in result.result_text or "Agent planning stopped" in result.result_text:
         st.error(f"### {result.result_text}")
     else:
-        st.success(f"### {result.result_text}")
+        st.success(result.result_text)
+
+        # Display dedicated Change Statistics if present
+        stats_ev = next((e for e in result.evidence if e.evidence_type.value == "statistics"), None)
+        if stats_ev and stats_ev.data:
+            st.markdown("#### 📊 Change Detection Statistics")
+            s_data = stats_ev.data
+            m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+            with m_col1:
+                st.metric("Changed Pixels", f"{s_data.get('changed_pixels', 0):,}")
+            with m_col2:
+                st.metric("Total Pixels", f"{s_data.get('total_pixels', 0):,}")
+            with m_col3:
+                st.metric("Percentage Changed", f"{s_data.get('percentage_changed', 0.0)}%")
+            with m_col4:
+                if s_data.get("changed_area_sq_m") is not None:
+                    st.metric("Changed Area", f"{s_data.get('changed_area_sq_m', 0.0):,.1f} m² ({s_data.get('changed_area_ha', 0.0):.2f} ha)")
+                else:
+                    st.metric("Unchanged Pixels", f"{s_data.get('unchanged_pixels', 0):,}")
 
     # 6. VISUAL EVIDENCE
     st.header("6. Visual Evidence")

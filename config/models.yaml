@@ -33,10 +33,10 @@ models:
     name: Open-CD BIT ResNet-18
     version: r18-levir
     capabilities: [change_detect]
-    adapter: satquery.models.unconfigured.UnconfiguredChangeDetectionModel
-    enabled: false
-    weights_path: null
-    notes: Specialist integration deferred.
+    adapter: satquery.models.opencd_bit.OpenCDBITModel
+    enabled: true
+    weights_path: models/checkpoints/bit_r18_256x256_40k_levircd.pth
+    notes: Pretrained Open-CD BIT model on LEVIR-CD.
 
   - id: cdvqa_baseline
     name: CDVQA baseline

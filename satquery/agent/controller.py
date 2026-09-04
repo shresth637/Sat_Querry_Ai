@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 from typing import Any, Optional
 
 from satquery.agent.router import route_query
@@ -124,6 +124,8 @@ class AgentController:
 
         # 6. Execution
         result_text = ""
+        model_result: Optional[Any] = None
+
         with tracer.span(step="execute_specialists", component="executor"):
             if plan.blocked:
                 result_text = (
@@ -137,9 +139,30 @@ class AgentController:
                     + "\n".join(f"- {msg}" for msg in blocking_msgs)
                 )
             else:
-                # Specialist models are currently unconfigured in Phase 2
+                # Find available ready model adapters for this plan
+                ready_adapters = [a for a in selected_adapters if a.status == "ready"]
                 unconfigured_models = [a.name for a in selected_adapters if a.status == "not_configured"]
-                if unconfigured_models:
+
+                if ready_adapters:
+                    # Execute first ready specialist (e.g. Open-CD BIT)
+                    active_adapter = ready_adapters[0]
+                    t0_slot = next((s for s in slots if s.slot_id == "t0"), slots[0] if len(slots) > 0 else None)
+                    t1_slot = next((s for s in slots if s.slot_id == "t1"), slots[1] if len(slots) > 1 else None)
+
+                    inputs_dict = {
+                        "t0": t0_slot.file_path if t0_slot else None,
+                        "t1": t1_slot.file_path if t1_slot else None,
+                        "slots": slots,
+                        "metas": metas,
+                    }
+
+                    model_result = active_adapter.predict(inputs_dict)
+                    if model_result.status == "success":
+                        result_text = model_result.text or "Change detection analysis completed."
+                    else:
+                        result_text = f"Specialist inference failed: {model_result.error}"
+                        uncertainties.append(f"Inference error: {model_result.error}")
+                elif unconfigured_models:
                     result_text = (
                         "Specialist model not configured.\n\n"
                         "The SatQuery agent successfully identified the required specialist workflow, "
@@ -149,20 +172,58 @@ class AgentController:
                         f"Specialist model(s) {unconfigured_models} not configured on local system."
                     )
                 else:
-                    # If models are configured in later phases, predict here
-                    result_text = "Analysis executed."
+                    result_text = "No compatible specialist model could be resolved."
 
         # 7. Integrate evidence
         with tracer.span(step="integrate_evidence", component="evidence_integrator"):
-            pass
+            if model_result and model_result.status == "success" and model_result.artifacts:
+                from satquery.evidence.builder import (
+                    create_change_map_evidence,
+                    create_statistics_evidence,
+                )
+                for artifact in model_result.artifacts:
+                    art_type = artifact.get("type")
+                    if art_type == "change_mask_geotiff":
+                        evidence_items.append(
+                            create_change_map_evidence(
+                                title="Binary Change Mask (GeoTIFF)",
+                                file_path=artifact.get("path"),
+                                crs=artifact.get("crs"),
+                                description="Georeferenced binary change map preserving original raster bounds and CRS",
+                            )
+                        )
+                    elif art_type == "change_visualization":
+                        evidence_items.append(
+                            create_preview_evidence(
+                                file_path=artifact.get("path"),
+                                title="Change Map Visual Overlay",
+                                description="Visual representation of detected change (red = changed)",
+                            )
+                        )
+                    elif art_type == "change_statistics":
+                        evidence_items.append(
+                            create_statistics_evidence(
+                                stats=artifact.get("data", {}),
+                                title="Bi-Temporal Change Statistics",
+                            )
+                        )
 
         # 8. Confidence estimation
         with tracer.span(step="estimate_confidence", component="confidence_estimator"):
-            confidence = build_confidence_report(
-                score=None,
-                source="not_available",
-                reason="The selected specialist does not currently provide a calibrated confidence score.",
-            )
+            if model_result and model_result.status == "success" and model_result.raw_scores and model_result.raw_scores.get("confidence_score") is not None:
+                confidence = build_confidence_report(
+                    score=model_result.raw_scores["confidence_score"],
+                    source="model",
+                    method="bit_softmax_mean_confidence",
+                    signals_used=["softmax_probabilities", "prediction_margin"],
+                    reason="Mean class-assignment probability derived from Open-CD BIT output layer",
+                )
+            else:
+                confidence = build_confidence_report(
+                    score=None,
+                    source="not_available",
+                    reason="The selected specialist does not currently provide a calibrated confidence score.",
+                )
 
         return AnalysisResult(
             query=query,

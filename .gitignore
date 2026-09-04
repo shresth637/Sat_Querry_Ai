@@ -1,4 +1,4 @@
-﻿# Environment
+# Environment
 .venv/
 env/
 venv/
@@ -22,7 +22,7 @@ build/
 *.local
 
 # Model weights and checkpoints
-models/
+/models/
 *.pth
 *.pt
 *.bin

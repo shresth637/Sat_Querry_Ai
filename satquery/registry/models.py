@@ -1,4 +1,4 @@
-﻿import importlib
+import importlib
 from pathlib import Path
 from typing import Any, Optional, Union
 import yaml
@@ -73,9 +73,17 @@ class ModelRegistry:
                 module_name, class_name = adapter_path.rsplit(".", 1)
                 mod = importlib.import_module(module_name)
                 adapter_cls = getattr(mod, class_name)
-                adapter_inst = adapter_cls()
+                weights_path = entry.get("weights_path")
+                try:
+                    if weights_path:
+                        adapter_inst = adapter_cls(weights_path=weights_path)
+                    else:
+                        adapter_inst = adapter_cls()
+                except TypeError:
+                    adapter_inst = adapter_cls()
+
                 registry.register(model_id=mid, adapter=adapter_inst, enabled=enabled, metadata=entry)
-            except Exception as e:
+            except Exception:
                 # Log or keep record of failure without crashing
                 pass
 

@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 from satquery.agent.controller import AgentController
 from satquery.domain.schemas import (
     InputMode,
@@ -40,7 +40,9 @@ def test_scenario_3_and_4_bitemporal_change(optical_geotiff: Path):
     assert res.plan.task == TaskType.BI_TEMPORAL_CHANGE.value
     assert res.plan.blocked is False
     assert res.validation.status == ValidationStatus.PASS
-    assert "Specialist model not configured" in res.result_text
+    assert "Open-CD BIT" in res.result_text
+    assert res.confidence.is_available is True
+    assert res.confidence.source == "model"
 
 
 def test_scenario_5_and_6_optical_sar_pair(optical_geotiff: Path, sar_geotiff: Path):
