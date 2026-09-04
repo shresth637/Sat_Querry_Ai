@@ -53,6 +53,24 @@ class TraceStatus(str, Enum):
     ERROR = "error"
 
 
+class TaskType(str, Enum):
+    SINGLE_VQA = "SINGLE_VQA"
+    SINGLE_CAPTION = "SINGLE_CAPTION"
+    SINGLE_GROUNDING = "SINGLE_GROUNDING"
+    BI_TEMPORAL_CHANGE = "BI_TEMPORAL_CHANGE"
+    CHANGE_VQA = "CHANGE_VQA"
+    OPTICAL_SAR_ANALYSIS = "OPTICAL_SAR_ANALYSIS"
+
+
+class QueryTheme(str, Enum):
+    AGRICULTURE = "AGRICULTURE"
+    DISASTER = "DISASTER"
+    URBAN = "URBAN"
+    ENVIRONMENT = "ENVIRONMENT"
+    INFRASTRUCTURE = "INFRASTRUCTURE"
+    GENERAL = "GENERAL"
+
+
 class RasterMeta(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -129,6 +147,7 @@ class AgentPlan(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     blocked: bool = False
     block_reason: Optional[str] = None
+    theme: QueryTheme = QueryTheme.GENERAL
 
 
 class ModelResult(BaseModel):
@@ -178,3 +197,18 @@ class TraceEvent(BaseModel):
     parameters: Optional[dict[str, Any]] = None
     error: Optional[str] = None
     details: Optional[dict[str, Any]] = None
+
+
+class AnalysisResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: str
+    plan: AgentPlan
+    result_text: str
+    confidence: ConfidenceReport
+    evidence: list[Evidence] = Field(default_factory=list)
+    trace: list[TraceEvent] = Field(default_factory=list)
+    validation: ValidationReport
+    metas: dict[str, RasterMeta] = Field(default_factory=dict)
+    qualities: dict[str, ImageQuality] = Field(default_factory=dict)
+    uncertainties: list[str] = Field(default_factory=list)

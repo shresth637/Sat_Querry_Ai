@@ -1,5 +1,6 @@
 ﻿from satquery.domain.schemas import (
     AgentPlan,
+    AnalysisResult,
     ConfidenceReport,
     Evidence,
     EvidenceType,
@@ -9,9 +10,11 @@
     Modality,
     ModelResult,
     QualityLevel,
+    QueryTheme,
     RasterMeta,
     SlotAssignment,
     SpatialCompatibility,
+    TaskType,
     TraceEvent,
     TraceStatus,
     ValidationCheck,
@@ -21,6 +24,7 @@
 
 __all__ = [
     "AgentPlan",
+    "AnalysisResult",
     "ConfidenceReport",
     "Evidence",
     "EvidenceType",
@@ -30,9 +34,11 @@ __all__ = [
     "Modality",
     "ModelResult",
     "QualityLevel",
+    "QueryTheme",
     "RasterMeta",
     "SlotAssignment",
     "SpatialCompatibility",
+    "TaskType",
     "TraceEvent",
     "TraceStatus",
     "ValidationCheck",
