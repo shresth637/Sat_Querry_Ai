@@ -140,26 +140,45 @@ class AgentController:
                     + "\n".join(f"- {msg}" for msg in blocking_msgs)
                 )
             else:
-                # Find available ready model adapters for this plan
-                ready_adapters = [a for a in selected_adapters if a.status == "ready"]
+                # Find available ready or unloaded model adapters for this plan
+                available_adapters = [a for a in selected_adapters if a.status in ["ready", "unloaded"]]
                 unconfigured_models = [a.name for a in selected_adapters if a.status == "not_configured"]
 
-                if ready_adapters:
-                    # Execute first ready specialist (e.g. Open-CD BIT)
-                    active_adapter = ready_adapters[0]
+                active_adapter = None
+                if available_adapters:
+                    from satquery.models.manager import get_resource_manager
+                    rm = get_resource_manager()
+                    model_id = plan.selected_models[0] if plan.selected_models else "specialist"
+                    target_adapter = available_adapters[0]
+                    active_adapter = rm.acquire_model(
+                        model_id=model_id,
+                        adapter=target_adapter,
+                        is_large=(target_adapter.version == "7B"),
+                    )
+
                     t0_slot = next((s for s in slots if s.slot_id == "t0"), slots[0] if len(slots) > 0 else None)
                     t1_slot = next((s for s in slots if s.slot_id == "t1"), slots[1] if len(slots) > 1 else None)
+                    primary_image = slots[0].file_path if slots else None
 
                     inputs_dict = {
+                        "image": primary_image,
+                        "query": query,
                         "t0": t0_slot.file_path if t0_slot else None,
                         "t1": t1_slot.file_path if t1_slot else None,
                         "slots": slots,
                         "metas": metas,
                     }
 
-                    model_result = active_adapter.predict(inputs_dict, **kwargs)
+                    model_result = active_adapter.predict(inputs_dict, model_id=model_id, **kwargs)
                     if model_result.status == "success":
-                        result_text = model_result.text or "Change detection analysis completed."
+                        result_text = model_result.text or "Specialist analysis completed."
+                    elif model_result.status == "not_configured":
+                        result_text = (
+                            "Specialist model not configured.\n\n"
+                            "The SatQuery agent successfully identified the required specialist workflow, "
+                            "but the specialist model is not currently configured."
+                        )
+                        uncertainties.append(f"Specialist model {active_adapter.name} not configured.")
                     else:
                         result_text = f"Specialist inference failed: {model_result.error}"
                         uncertainties.append(f"Inference error: {model_result.error}")
@@ -202,51 +221,72 @@ class AgentController:
                                 description="Continuous float32 change probability map in [0, 1] at native raster resolution",
                             )
                         )
-                    elif art_type == "change_visualization":
+                    elif art_type in [
+                        "change_visualization",
+                        "change_regions_visualization",
+                        "land_cover_chart",
+                        "grounding_visualization",
+                    ]:
+                        title_map = {
+                            "change_visualization": "Change Map Visual Overlay",
+                            "change_regions_visualization": "Change Regions with Bounding Boxes",
+                            "land_cover_chart": "Land-Cover Probability Distribution",
+                            "grounding_visualization": "Spatial Grounding Visual Overlay",
+                        }
                         evidence_items.append(
                             create_preview_evidence(
                                 file_path=artifact.get("path"),
-                                title="Change Map Visual Overlay",
-                                description="Visual representation of detected change (red = changed)",
+                                title=title_map.get(art_type, "Visual Output"),
+                                description=artifact.get("description", "Generated visual artifact"),
                             )
                         )
-                    elif art_type == "change_regions_visualization":
-                        evidence_items.append(
-                            create_preview_evidence(
-                                file_path=artifact.get("path"),
-                                title="Change Regions with Bounding Boxes",
-                                description="Visual overlay identifying individual contiguous change regions and ranking badges",
-                            )
-                        )
-                    elif art_type == "change_regions_geojson":
+                    elif art_type in ["change_regions_geojson", "grounding_geojson"]:
                         from satquery.domain.schemas import Evidence, EvidenceType
+                        title_map = {
+                            "change_regions_geojson": "Change Regions Vector Map (GeoJSON)",
+                            "grounding_geojson": "Spatial Grounding Vector Map (GeoJSON)",
+                        }
                         evidence_items.append(
                             Evidence(
-                                evidence_type=EvidenceType.CHANGE_MAP,
-                                title="Change Regions Vector Map (GeoJSON)",
+                                evidence_type=EvidenceType.CHANGE_MAP if "change" in art_type else EvidenceType.BOUNDING_BOX,
+                                title=title_map.get(art_type, "Vector Map (GeoJSON)"),
                                 file_path=artifact.get("path"),
                                 data=artifact.get("data"),
                                 crs=artifact.get("crs"),
-                                description="RFC 7946 GeoJSON FeatureCollection of significant connected change regions with bounding boxes and metrics",
+                                description=artifact.get("description", "RFC 7946 GeoJSON FeatureCollection"),
                             )
                         )
-                    elif art_type == "change_statistics":
+                    elif art_type in ["change_statistics", "land_cover_statistics"]:
                         evidence_items.append(
                             create_statistics_evidence(
                                 stats=artifact.get("data", {}),
-                                title="Bi-Temporal Change Statistics",
+                                title="Bi-Temporal Change Statistics" if "change" in art_type else "Land-Cover Classification Statistics",
                             )
                         )
 
         # 8. Confidence estimation
         with tracer.span(step="estimate_confidence", component="confidence_estimator"):
             if model_result and model_result.status == "success" and model_result.raw_scores and model_result.raw_scores.get("confidence_score") is not None:
+                adapter_name_lower = str(getattr(active_adapter, "name", "")).lower()
+                if "bit" in adapter_name_lower or "change" in adapter_name_lower:
+                    method = "bit_softmax_mean_confidence"
+                    signals = ["softmax_probabilities", "prediction_margin", "sliding_window_probabilities"]
+                    reason = "Mean prediction confidence derived from Open-CD BIT output layer across all sliding window tiles"
+                elif "bigearthnet" in adapter_name_lower:
+                    method = "bigearthnet_sigmoid_max_confidence"
+                    signals = ["sigmoid_probabilities", "class_threshold_margin"]
+                    reason = "Highest class confidence score derived from BigEarthNet v2 ResNet-50 output layer"
+                else:
+                    method = "model_confidence_score"
+                    signals = ["raw_model_confidence"]
+                    reason = f"Confidence score derived from {active_adapter.name}"
+
                 confidence = build_confidence_report(
                     score=model_result.raw_scores["confidence_score"],
                     source="model",
-                    method="bit_softmax_mean_confidence",
-                    signals_used=["softmax_probabilities", "prediction_margin", "sliding_window_probabilities"],
-                    reason="Mean prediction confidence derived from Open-CD BIT output layer across all sliding window tiles",
+                    method=method,
+                    signals_used=signals,
+                    reason=reason,
                 )
             else:
                 confidence = build_confidence_report(

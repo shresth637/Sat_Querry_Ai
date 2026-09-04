@@ -80,7 +80,8 @@ class ModelRegistry:
                 for param in [
                     "tile_size", "tile_overlap", "change_threshold",
                     "batch_size", "device", "min_change_region_pixels",
-                    "max_regions_visualized",
+                    "max_regions_visualized", "threshold", "quantization",
+                    "capability",
                 ]:
                     if param in entry:
                         init_kwargs[param] = entry[param]

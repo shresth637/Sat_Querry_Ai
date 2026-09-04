@@ -6,28 +6,31 @@ models:
     name: GeoChat-7B
     version: "7B"
     capabilities: [vqa]
-    adapter: satquery.models.unconfigured.UnconfiguredVQAModel
+    adapter: satquery.models.geochat.GeoChatVLMModel
+    capability: image_vqa
     enabled: false
     weights_path: null
-    notes: Not implemented in this foundation. Do not auto-download.
+    notes: Not loaded until weights exist locally.
 
   - id: geochat_caption
     name: GeoChat-7B
     version: "7B"
     capabilities: [caption]
-    adapter: satquery.models.unconfigured.UnconfiguredCaptioningModel
+    adapter: satquery.models.geochat.GeoChatVLMModel
+    capability: image_caption
     enabled: false
     weights_path: null
-    notes: Not implemented in this foundation.
+    notes: Not loaded until weights exist locally.
 
   - id: geochat_grounding
     name: GeoChat-7B
     version: "7B"
     capabilities: [grounding]
-    adapter: satquery.models.unconfigured.UnconfiguredGroundingModel
+    adapter: satquery.models.geochat.GeoChatVLMModel
+    capability: grounding
     enabled: false
     weights_path: null
-    notes: Not implemented in this foundation.
+    notes: Not loaded until weights exist locally.
 
   - id: opencd_bit_change
     name: Open-CD BIT ResNet-18
@@ -57,10 +60,11 @@ models:
   - id: bigearthnet_resnet50_s1s2
     name: BigEarthNet v2 ResNet-50 S1+S2
     version: v0.2.0
-    capabilities: [optical_sar_fusion, land_cover]
-    adapter: satquery.models.unconfigured.UnconfiguredOpticalSARModel
+    capabilities: [optical_sar_fusion, land_cover, classification]
+    adapter: satquery.models.bigearthnet.BigEarthNetModel
     enabled: false
     weights_path: null
+    threshold: 0.3
     rs_adapted: true
     notes: M1 target. Not loaded until weights exist locally.
 

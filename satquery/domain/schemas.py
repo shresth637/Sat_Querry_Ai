@@ -1,4 +1,4 @@
-﻿from enum import Enum
+from enum import Enum
 from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -44,6 +44,7 @@ class EvidenceType(str, Enum):
     CHANGE_MAP = "change_map"
     STATISTICS = "statistics"
     METADATA = "metadata"
+    CLASSIFICATION = "classification"
 
 
 class TraceStatus(str, Enum):
@@ -57,9 +58,38 @@ class TaskType(str, Enum):
     SINGLE_VQA = "SINGLE_VQA"
     SINGLE_CAPTION = "SINGLE_CAPTION"
     SINGLE_GROUNDING = "SINGLE_GROUNDING"
+    CLASSIFICATION = "CLASSIFICATION"
     BI_TEMPORAL_CHANGE = "BI_TEMPORAL_CHANGE"
     CHANGE_VQA = "CHANGE_VQA"
     OPTICAL_SAR_ANALYSIS = "OPTICAL_SAR_ANALYSIS"
+
+
+class ModelCapability(str, Enum):
+    CHANGE_DETECTION = "change_detection"
+    IMAGE_VQA = "image_vqa"
+    IMAGE_CAPTION = "image_caption"
+    GROUNDING = "grounding"
+    CLASSIFICATION = "classification"
+    OPTICAL_SAR_FUSION = "optical_sar_fusion"
+
+
+class GroundingBox(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    confidence: float = 1.0
+    box_2d: list[float]  # [ymin, xmin, ymax, xmax] in pixel coordinates
+    geo_bbox: Optional[list[float]] = None  # [minx, miny, maxx, maxy] in CRS
+    geometry: Optional[dict[str, Any]] = None  # GeoJSON polygon
+
+
+class LandCoverPrediction(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    class_name: str
+    probability: float
+    threshold: float = 0.3
+    is_detected: bool = True
 
 
 class QueryTheme(str, Enum):

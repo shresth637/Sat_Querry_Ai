@@ -4,83 +4,58 @@ SatQuery AI is an agentic Earth observation and satellite imagery platform desig
 
 ---
 
-## Phase 3C: Spatial Intelligence & Production UX
+## Phase 4: Multi-Model Satellite Intelligence
 
-Phase 3C elevates SatQuery AI into a production-grade geospatial intelligence system. Beyond pixel-level change detection, the platform now extracts connected spatial change regions, polygonizes them into standard GeoJSON vectors, visualizes ranked bounding boxes, and generates structured, factual natural language intelligence reports.
+Phase 4 evolves SatQuery AI into a comprehensive multi-model satellite intelligence platform. Beyond bi-temporal change detection, the platform now integrates multi-label land-cover scene classification, vision-language intelligence, spatial bounding box grounding, and dynamic VRAM/device resource management.
 
 ### Key Capabilities
 
-1. **Spatial Change Region Extraction & Vectorization**
-   - **GDAL/Rasterio Polygonization**: Employs `rasterio.features.shapes` to convert binary change masks into vector polygons directly in native Coordinate Reference System (CRS) coordinates.
-   - **Connected Component Attributes**: Calculates pixel count, physical surface area ($m^2$ and hectares), geographic/projected centroid, and bounding box for every discrete change cluster.
-   - **Configurable Noise Filtering**: Eliminates speckle noise via `min_change_region_pixels` (default: 20 pixels), filtering out isolated pixel noise while preserving significant regional changes.
-   - **RFC 7946 GeoJSON Export**: Automatically serializes extracted regions to `change_regions.geojson` containing full vector geometries and metadata.
+1. **Multi-Model Architecture & Catalog**
+   - **Open-CD BIT ResNet-18 (`opencd_bit_change`)**: **READY**. Production bi-temporal change detection with 256×256 tiled sliding-window inference, 2D cosine blending, spatial change region extraction, and RFC 7946 GeoJSON export.
+   - **BigEarthNet v2 (reBEN) ResNet-50 (`bigearthnet_resnet50_s1s2`)**: **INTEGRATED**. 19 Corine Land Cover multi-label scene classifier on Sentinel-2 optical imagery. Generates class probability distributions, publication-ready horizontal bar charts (`land_cover_distribution.png`), and structured factual summaries.
+   - **GeoChat-7B VLM (`geochat_vqa`, `geochat_caption`, `geochat_grounding`)**: **INTEGRATED ADAPTER**. Vision-language model supporting single-image visual QA, detailed scene descriptions, and referring expression grounding. Includes 4-bit `bitsandbytes` quantization for 6 GB GPUs, CPU fallback, and strict honesty reporting (`status="not_configured"` if 14 GB checkpoint is absent).
 
-2. **Ranked Change Regions Visualization**
-   - Renders a publication-ready visualization (`change_regions_vis.png`) on top of Date T1 satellite imagery.
-   - Highlights the top detected regions (up to 20 by area) with high-contrast bounding boxes, numbered ranking badges (`#1 (1,240px)`), and semi-transparent fills.
+2. **Resource & Device Governance (`satquery/models/manager.py`)**
+   - **Hardware Detection**: Automatically detects host CUDA capabilities and VRAM constraints (e.g. host NVIDIA GeForce RTX 4050 6 GB GPU) with safe CPU fallback.
+   - **Lazy Loading**: Specialist models are loaded into memory/device only when requested by an active plan.
+   - **Single-Model Residency**: To protect the 6 GB VRAM budget, only one large model resides in VRAM at any given time.
+   - **Cache Cleanup**: Automatically triggers Python garbage collection and `torch.cuda.empty_cache()` whenever models are swapped.
 
-3. **Structured Factual Natural Language Interpretation**
-   - Replaces generic text with an 8-section technical intelligence report:
-     - **SUMMARY**: Executive assessment of detected changes and scene footprint.
-     - **WHAT CHANGED**: Factual descriptions based strictly on model scope (explicit LEVIR-CD building/structure change focus; no fabricated semantics).
-     - **HOW MUCH CHANGED**: Metric change statistics (hectares, $m^2$, change %, pixel count).
-     - **SPATIAL DISTRIBUTION**: Count of significant regions, noise filtered, top 5 largest clusters with area and centroids.
-     - **CONFIDENCE**: Mean prediction probability, changed/unchanged confidence, and low-confidence percentage.
-     - **GEOSPATIAL INFORMATION**: CRS, affine transform, dimensions, spatial resolution, and ellipsoidal/planar area calculation method.
-     - **ARTIFACTS**: Canonical absolute paths to all 6 generated outputs.
-     - **LIMITATIONS**: Explicit model domain boundaries, resolution constraints, and verification recommendations.
+3. **Spatial Grounding & Bounding Box Intelligence (`satquery/models/grounding.py`)**
+   - **Standardized Coordinates**: Converts normalized $[ymin, xmin, ymax, xmax]$ predictions to discrete raster pixel coordinates $[xmin, ymin, xmax, ymax]$ and native CRS geographic/projected coordinates.
+   - **RFC 7946 GeoJSON**: Serializes bounding boxes to `grounding_boxes.geojson` with native EPSG CRS URN metadata.
+   - **Visual Overlays**: Renders high-contrast bounding boxes, ranking badges (`#1 water_body (0.95)`), and semi-transparent fills (`grounding_overlay.png`).
 
-4. **Production Run Isolation & Artifact Pipeline**
-   - Every inference execution is isolated in its own run directory:
-     `outputs/change_maps/run_<YYYYMMDD_HHMMSS>_<uuid8>/`
-   - Complete 6-artifact delivery per run:
-     - `change_mask.tif`: Discrete `uint8` GeoTIFF (`0 = unchanged`, `1 = changed`).
-     - `change_prob.tif`: Continuous `float32` GeoTIFF ($[0.0, 1.0]$ probability map).
-     - `change_overlay.png`: High-contrast red overlay on Date T1 imagery.
-     - `change_regions_vis.png`: Ranked bounding box overlay with ranking badges.
-     - `change_regions.geojson`: Vector polygons with geometry and physical metrics.
-     - `stats.json`: Machine-readable execution statistics, confidence, and region metadata.
+4. **Multi-Modal Semantic Query Router (`QueryIntentParser`)**
+   - Deterministically extracts:
+     - **Task Type**: `CLASSIFICATION`, `SINGLE_VQA`, `SINGLE_CAPTION`, `SINGLE_GROUNDING`, `BI_TEMPORAL_CHANGE`, `CHANGE_VQA`, `OPTICAL_SAR_ANALYSIS`
+     - **Temporal Mode**: `SINGLE_IMAGE`, `BITEMPORAL`, `OPTICAL_SAR`
+     - **Spatial Requirement**: `WHOLE_SCENE`, `REGIONAL_CLUSTERS`, `BOUNDING_BOX_GROUNDING`
+   - Intelligently routes land-cover, crop, forest, and scene classification queries to BigEarthNet, questions to VQA, descriptions to Captioning, and differences/construction to Change Detection.
 
-5. **Production Streamlit UX**
-   - **6-Step Guided Workflow**: (1) Data Input & Mode Selection, (2) Spatial & Model Parameters, (3) Natural Language Query, (4) Execution Engine, (5) Spatial Intelligence Results, (6) Artifact Downloads.
-   - **Real-Time Stage Progress Indicators**: Live `st.status` widget showing raster validation, tiled sliding-window inference, spatial region extraction, and report formatting.
-   - **Dedicated Change Regions View**: Tabbed visual evidence featuring T0, T1, Probability, Binary Mask, Change Overlay, and Change Regions.
-   - **Direct Downloads**: UI buttons to download GeoTIFFs, PNGs, stats JSON, and GeoJSON.
-
-6. **Large-Image Tiled Sliding-Window Inference**
-   - High-resolution satellite scenes (512×512, 1024×1024, and larger) are divided into overlapping 256×256 tiles with configurable overlap (default 25% / 64 px).
-   - Reconstructed seamlessly at full native spatial resolution using a 2D cosine blend window, eliminating edge seams and tile boundary artifacts.
-
-7. **Geodesically Rigorous Physical Area Calculation**
-   - **Projected CRS (e.g. UTM)**: Direct planar metric calculation ($m^2$, hectares, $km^2$).
-   - **Geographic CRS (e.g. EPSG:4326)**: WGS84 ellipsoidal surface area calculation scaling latitude and longitude degree deltas by local radii of curvature ($M$ and $N$).
-
-8. **Enhanced Natural Language Query Router**
-   - Intelligently recognizes queries including "construction", "differences", "compare", "changed buildings", "urban expansion", and "surface differences", routing seamlessly to the change detection pipeline.
+5. **Adaptive Production Streamlit UX (`app.py`)**
+   - **Multi-Workflow Switcher**: Seamlessly toggles between **Single Satellite Image**, **Bi-Temporal Pair (Change Detection)**, and **Optical + SAR Pair**.
+   - **Dynamic Controls**: Displays relevant parameters based on active mode (e.g., Land-Cover Confidence Threshold slider for Single Image; Change Threshold and Min Region Size sliders for Bi-Temporal).
+   - **Real-Time Stage Progression**: Multi-stage `st.status` widget tracking raster inspection, intent parsing, neural inference, and artifact generation.
+   - **Dynamic Evidence Tabs**: Automatically presents relevant tabs (Source Scene, Land-Cover Classes, Change Probability, Binary Mask, Change Overlay, Change Regions, Grounded Bounding Boxes).
+   - **One-Click Artifact Downloads**: Direct UI buttons to download GeoTIFFs, PNG visualizations, GeoJSON vectors, and machine-readable JSON statistics.
 
 ---
 
 ## Model Architecture & Checkpoint Information
 
-* **Architecture**: Bitemporal Image Transformer (BIT) (Chen et al., 2021; Open-CD).
-  * **Backbone**: ResNetV1c (stem with three 3×3 convolutions, stages 1–3 feature extraction).
-  * **Decoder**: Spatial-Temporal Tokenizer, Transformer Encoder, and Transformer Decoder (`BITHead`) with spatial differencing.
-* **Checkpoint**: `models/checkpoints/bit_r18_256x256_40k_levircd.pth` (40.5 MB).
-* **Weights Source**: Likyoo Open-CD Model Zoo (`likyoo/Open-CD_Model_Zoo`).
-* **Training Dataset**: LEVIR-CD building change detection benchmark.
-* **Domain Note**: The model is pretrained on the LEVIR-CD benchmark (primarily building and urban change detection). Detection characteristics on arbitrary natural surfaces, agricultural plots, or SAR imagery may differ.
-
----
-
-## Input Requirements & Geospatial Validation
-
-Before neural execution, the agent performs strict geospatial validation:
-* Both T0 and T1 files must exist on disk and be readable by Rasterio.
-* Both rasters must have matching dimensions (`width` and `height`).
-* Rasters must share the same Coordinate Reference System (CRS).
-* Rasters must share the same affine transform (spatial bounds and pixel resolution).
-* Misaligned or incompatible rasters are rejected with explicit diagnostic messages.
+* **Open-CD BIT ResNet-18**:
+  * Architecture: ResNetV1c stem + Spatial-Temporal Tokenizer + Transformer Encoder/Decoder.
+  * Checkpoint: `models/checkpoints/bit_r18_256x256_40k_levircd.pth` (40.5 MB).
+  * Status: **READY**.
+* **BigEarthNet v2 ResNet-50**:
+  * Architecture: ResNet-50 backbone with 19-class linear sigmoid projection.
+  * Checkpoint: `models/checkpoints/resnet50_s2_v0.2.0.pth` (~95 MB).
+  * 19 Classes: Urban fabric, Industrial/commercial, Arable land, Permanent crops, Pastures, Complex cultivation, Agriculture, Broad-leaved forest, Coniferous forest, Mixed forest, Natural grassland, Moors/heathlands, Sclerophyllous vegetation, Transitional woodland, Beaches/dunes/sands, Bare rock, Sparsely vegetated, Inland wetlands, Marine/coastal waters.
+* **GeoChat-7B**:
+  * Architecture: CLIP-ViT-L/14-336 + Vicuna-7B v1.5 / LLaMA-2 backbone.
+  * Size: 14.2 GB.
+  * Quantization: 4-bit NF4 via `bitsandbytes` when CUDA is active; status reports `not_configured` when weights are not downloaded.
 
 ---
 
@@ -89,6 +64,7 @@ Before neural execution, the agent performs strict geospatial validation:
 Model parameters can be customized in [`config/models.yaml`](file:///C:/Users/HP/Projects/satquery-ai/config/models.yaml):
 
 ```yaml
+models:
   - id: opencd_bit_change
     name: Open-CD BIT ResNet-18
     version: r18-levir
@@ -101,8 +77,26 @@ Model parameters can be customized in [`config/models.yaml`](file:///C:/Users/HP
     change_threshold: 0.5
     min_change_region_pixels: 20
     max_regions_visualized: 20
-    batch_size: 4
     device: auto
+
+  - id: bigearthnet_resnet50_s1s2
+    name: BigEarthNet v2 ResNet-50 S1+S2
+    version: v0.2.0
+    capabilities: [optical_sar_fusion, land_cover, classification]
+    adapter: satquery.models.bigearthnet.BigEarthNetModel
+    enabled: false
+    weights_path: models/checkpoints/resnet50_s2_v0.2.0.pth
+    threshold: 0.3
+    device: auto
+
+  - id: geochat_vqa
+    name: GeoChat-7B
+    version: "7B"
+    capabilities: [vqa]
+    adapter: satquery.models.geochat.GeoChatVLMModel
+    capability: image_vqa
+    enabled: false
+    weights_path: null
 ```
 
 ---
@@ -113,9 +107,9 @@ Measured on the local environment (`torch==2.14.0+cpu`):
 
 | Scene Dimensions | Pixel Count | Tiles Evaluated | Preprocess Time | Inference Time | Postprocess Time | Total Time |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **256 × 256** | 65,536 | 1 | 0.015 s | 0.101 s | 0.069 s | **0.242 s** |
-| **512 × 512** | 262,144 | 9 | 0.055 s | 0.786 s | 0.054 s | **1.021 s** |
-| **1024 × 1024** | 1,048,576 | 25 | 0.231 s | 2.334 s | 0.172 s | **2.977 s** |
+| **256 × 256** | 65,536 | 1 | 0.016 s | 0.104 s | 0.083 s | **0.259 s** |
+| **512 × 512** | 262,144 | 9 | 0.059 s | 0.889 s | 0.112 s | **1.090 s** |
+| **1024 × 1024** | 1,048,576 | 25 | 0.252 s | 2.557 s | 0.413 s | **3.253 s** |
 
 To run the benchmark utility:
 ```powershell
@@ -135,27 +129,30 @@ To run the benchmark utility:
 ```powershell
 .\.venv\Scripts\pytest.exe -v
 ```
-All 76 unit and integration tests pass covering:
-- Phase 1: Foundation, configuration, geospatial validators, evidence schemas
-- Phase 2: Agent controller, natural language routing, execution traces
-- Phase 3A: Open-CD BIT ResNet-18 model integration and weights verification
-- Phase 3B: Tiled sliding-window inference, geospatial preservation, area calculation
-- Phase 3C: Spatial change region extraction, GeoJSON vectorization, ranked visualizer, factual interpretation, UI workflow
+All **91 unit and integration tests** pass covering:
+- Phase 1: Foundation, configuration, geospatial validators, evidence schemas (17 tests)
+- Phase 2: Agent controller, natural language routing, execution traces (12 tests)
+- Phase 3A: Open-CD BIT ResNet-18 model integration and weights verification (17 tests)
+- Phase 3B: Tiled sliding-window inference, geospatial preservation, area calculation (18 tests)
+- Phase 3C: Spatial change region extraction, GeoJSON vectorization, ranked visualizer (12 tests)
+- Phase 4: ResourceManager, BigEarthNet classifier, GeoChat VLM adapter, grounding utilities, multi-model router (15 tests)
 
 ---
 
-## Example Workflow
+## Example Workflows
 
-1. Navigate to `http://localhost:8501/`.
-2. Under **1. Data Input & Mode**, select **Bi-Temporal Pair**.
-3. Upload the Date T0 ("Before") GeoTIFF and Date T1 ("After") GeoTIFF.
-4. Under **2. Spatial & Model Parameters**, adjust the **Change Threshold** (default: `0.50`) and **Min Region Size** (default: `20 px`) sliders.
-5. Under **3. Natural Language Query**, enter:
-   `"Identify any building or structural changes between T0 and T1"` or click an example query button.
-6. Click **🚀 Run Agent Analysis**.
-7. Observe the real-time stage progress indicator tracking validation, tiled inference, region vectorization, and report generation.
-8. View:
-   - Factual 8-section technical intelligence report.
-   - Key statistics metrics (Total Changed Area, Change %, Regions Detected, Confidence, Total Latency).
-   - Tabbed visual evidence: Before (T0), After (T1), Probability Map, Binary Mask, Change Overlay, and **Change Regions** with ranked bounding boxes.
-   - Download generated binary mask GeoTIFF, probability GeoTIFF, GeoJSON vector polygons, statistics JSON, and visualizations directly from the UI.
+### 1. Single-Image Land-Cover Scene Understanding
+1. Select **Single Satellite Image** in the Streamlit UI.
+2. Upload a satellite scene GeoTIFF.
+3. Adjust the **Land-Cover Confidence Threshold** (default: `0.30`).
+4. Enter: `"Classify the land-cover categories in this scene"`.
+5. Click **🚀 Run Agent Analysis**.
+6. View executive summary, top detected Corine classes, geospatial context, probability bar chart (`land_cover_distribution.png`), and download statistics JSON.
+
+### 2. Bi-Temporal Change Detection & Spatial Intelligence
+1. Select **Bi-Temporal Pair (Change Detection)** in the Streamlit UI.
+2. Upload the Date T0 ("Before") GeoTIFF and Date T1 ("After") GeoTIFF.
+3. Adjust the **Change Threshold** (default: `0.50`) and **Min Region Size** (default: `20 px`).
+4. Enter: `"What changed between these two dates?"`.
+5. Click **🚀 Run Agent Analysis**.
+6. View 8-section factual intelligence report, change statistics metrics, tabbed visual evidence (Probability, Binary Mask, Red Overlay, Ranked Labeled Regions), and download GeoTIFFs, PNGs, and RFC 7946 GeoJSON.

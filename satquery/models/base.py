@@ -1,4 +1,4 @@
-﻿from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod
 from typing import Any, Optional
 from satquery.domain.schemas import ModelResult
 
@@ -27,6 +27,10 @@ class ModelAdapter(ABC):
     def predict(self, inputs: dict[str, Any], **kwargs: Any) -> ModelResult:
         """Execute inference and return typed ModelResult."""
         pass
+
+    def unload(self) -> None:
+        """Unload weights from memory/device."""
+        self.status = "unloaded"
 
     def is_available(self) -> bool:
         return self.status == "ready"
