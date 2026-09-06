@@ -11,48 +11,46 @@ import html
 
 def render_header(cuda_available: bool = False, active_model_count: int = 2) -> str:
     """Render compact mission-control navbar with live status telemetry."""
-    return f"""
-    <div class="sat-navbar">
-        <div class="sat-brand">
-            <div class="sat-brand-icon">🛰️</div>
-            <div>
-                <div class="sat-brand-title">SATQUERY AI</div>
-                <div class="sat-brand-subtitle">SATELLITE INTELLIGENCE PLATFORM</div>
-            </div>
-        </div>
-        <div class="sat-nav-telemetry">
-            <div class="sat-status-badge">
-                <span class="sat-status-ping"></span>
-                <span>SYSTEM ONLINE</span>
-            </div>
-        </div>
-    </div>
-    """
+    return (
+        '<div class="sat-navbar">'
+        '<div class="sat-brand">'
+        '<div class="sat-brand-icon">🛰️</div>'
+        '<div>'
+        '<div class="sat-brand-title">SATQUERY AI</div>'
+        '<div class="sat-brand-subtitle">SATELLITE INTELLIGENCE PLATFORM</div>'
+        '</div>'
+        '</div>'
+        '<div class="sat-nav-telemetry">'
+        '<div class="sat-status-badge">'
+        '<span class="sat-status-ping"></span>'
+        '<span>SYSTEM ONLINE</span>'
+        '</div>'
+        '</div>'
+        '</div>'
+    )
 
 
 def render_hero() -> str:
     """Render high-impact mission hero banner with 4-step workflow breadcrumbs."""
-    return """
-    <div class="sat-hero">
-        <div class="sat-hero-header">
-            <div class="sat-hero-tag">🛰️ Autonomous Earth Observation & Remote Sensing</div>
-            <div class="sat-card-badge">MISSION CONTROL v4.2</div>
-        </div>
-        <div class="sat-hero-headline">ASK. ANALYZE. UNDERSTAND EARTH.</div>
-        <div class="sat-hero-sub">
-            Natural-language intelligence for satellite imagery.
-        </div>
-        <div class="sat-mission-steps">
-            <div class="sat-step-node"><span>01</span>&nbsp;&nbsp;DATA SOURCE</div>
-            <div class="sat-step-arrow">➔</div>
-            <div class="sat-step-node"><span>02</span>&nbsp;&nbsp;ASK SATQUERY AI</div>
-            <div class="sat-step-arrow">➔</div>
-            <div class="sat-step-node"><span>03</span>&nbsp;&nbsp;AI ROUTING</div>
-            <div class="sat-step-arrow">➔</div>
-            <div class="sat-step-node"><span>04</span>&nbsp;&nbsp;MISSION PRODUCTS</div>
-        </div>
-    </div>
-    """
+    return (
+        '<div class="sat-hero">'
+        '<div class="sat-hero-header">'
+        '<div class="sat-hero-tag">🛰️ Autonomous Earth Observation & Remote Sensing</div>'
+        '<div class="sat-card-badge">MISSION CONTROL v4.2</div>'
+        '</div>'
+        '<div class="sat-hero-headline">ASK. ANALYZE. UNDERSTAND EARTH.</div>'
+        '<div class="sat-hero-sub">Natural-language intelligence for satellite imagery.</div>'
+        '<div class="sat-mission-steps">'
+        '<div class="sat-step-node"><span>01</span>&nbsp;&nbsp;DATA SOURCE</div>'
+        '<div class="sat-step-arrow">➔</div>'
+        '<div class="sat-step-node"><span>02</span>&nbsp;&nbsp;ASK SATQUERY AI</div>'
+        '<div class="sat-step-arrow">➔</div>'
+        '<div class="sat-step-node"><span>03</span>&nbsp;&nbsp;AI ROUTING</div>'
+        '<div class="sat-step-arrow">➔</div>'
+        '<div class="sat-step-node"><span>04</span>&nbsp;&nbsp;MISSION PRODUCTS</div>'
+        '</div>'
+        '</div>'
+    )
 
 
 def render_pipeline_flow(
@@ -72,39 +70,39 @@ def render_pipeline_flow(
     if len(tools) > 3:
         tools_summary += f" +{len(tools)-3}"
 
-    return f"""
-    <div class="pipeline-flow">
-        <div class="flow-node completed">
-            <div class="flow-step-num">✓ QUERY</div>
-            <div class="flow-step-name">Natural Language Query</div>
-            <div class="flow-step-detail">"{safe_q}"</div>
-        </div>
-        <div class="flow-connector">➔</div>
-        <div class="flow-node completed">
-            <div class="flow-step-num">✓ AI ROUTER</div>
-            <div class="flow-step-name">Query Router</div>
-            <div class="flow-step-detail">{task}</div>
-        </div>
-        <div class="flow-connector">➔</div>
-        <div class="flow-node active">
-            <div class="flow-step-num">◉ SPECIALIST MODEL</div>
-            <div class="flow-step-name">{model_name}</div>
-            <div class="flow-step-detail">model: {model_id}</div>
-        </div>
-        <div class="flow-connector">➔</div>
-        <div class="flow-node completed">
-            <div class="flow-step-num">✓ SPATIAL ENGINE</div>
-            <div class="flow-step-name">Spatial Intelligence</div>
-            <div class="flow-step-detail">{tools_summary}</div>
-        </div>
-        <div class="flow-connector">➔</div>
-        <div class="flow-node completed">
-            <div class="flow-step-num">✓ MISSION PRODUCTS</div>
-            <div class="flow-step-name">Geospatial Products</div>
-            <div class="flow-step-detail">{outputs_summary}</div>
-        </div>
-    </div>
-    """
+    return (
+        '<div class="pipeline-flow">'
+        '<div class="flow-node completed">'
+        '<div class="flow-step-num">✓ QUERY</div>'
+        '<div class="flow-step-name">Natural Language Query</div>'
+        f'<div class="flow-step-detail">"{safe_q}"</div>'
+        '</div>'
+        '<div class="flow-connector">➔</div>'
+        '<div class="flow-node completed">'
+        '<div class="flow-step-num">✓ AI ROUTER</div>'
+        '<div class="flow-step-name">Query Router</div>'
+        f'<div class="flow-step-detail">{html.escape(task)}</div>'
+        '</div>'
+        '<div class="flow-connector">➔</div>'
+        '<div class="flow-node active">'
+        '<div class="flow-step-num">◉ SPECIALIST MODEL</div>'
+        f'<div class="flow-step-name">{html.escape(model_name)}</div>'
+        f'<div class="flow-step-detail">model: {html.escape(model_id)}</div>'
+        '</div>'
+        '<div class="flow-connector">➔</div>'
+        '<div class="flow-node completed">'
+        '<div class="flow-step-num">✓ SPATIAL ENGINE</div>'
+        '<div class="flow-step-name">Spatial Intelligence</div>'
+        f'<div class="flow-step-detail">{html.escape(tools_summary)}</div>'
+        '</div>'
+        '<div class="flow-connector">➔</div>'
+        '<div class="flow-node completed">'
+        '<div class="flow-step-num">✓ MISSION PRODUCTS</div>'
+        '<div class="flow-step-name">Geospatial Products</div>'
+        f'<div class="flow-step-detail">{html.escape(outputs_summary)}</div>'
+        '</div>'
+        '</div>'
+    )
 
 
 def render_top5_bars(top_5: list[dict[str, Any]]) -> str:
@@ -115,21 +113,15 @@ def render_top5_bars(top_5: list[dict[str, Any]]) -> str:
         prob = float(item.get("probability", 0.0))
         pct_str = f"{prob * 100:.2f}%"
         bar_width = f"{max(2.0, min(100.0, prob * 100)):.1f}%"
-
-        items_html.append(f"""
-        <div class="pred-item">
-            <div class="pred-header">
-                <div class="pred-class">
-                    <span class="pred-rank">#{idx:02d}</span>
-                    <span>{cls_name}</span>
-                </div>
-                <div class="pred-score">{pct_str}</div>
-            </div>
-            <div class="pred-track">
-                <div class="pred-fill" style="width: {bar_width};"></div>
-            </div>
-        </div>
-        """)
+        items_html.append(
+            f'<div class="pred-item">'
+            f'<div class="pred-header">'
+            f'<div class="pred-class"><span class="pred-rank">#{idx:02d}</span><span>{cls_name}</span></div>'
+            f'<div class="pred-score">{pct_str}</div>'
+            f'</div>'
+            f'<div class="pred-track"><div class="pred-fill" style="width: {bar_width};"></div></div>'
+            f'</div>'
+        )
 
     return f'<div class="pred-list">{"".join(items_html)}</div>'
 
@@ -142,14 +134,13 @@ def render_telemetry_hud(metrics: list[dict[str, str]]) -> str:
         val = html.escape(str(m.get("value", "")))
         hint = html.escape(m.get("hint", ""))
         hint_html = f'<div class="sat-metric-hint">{hint}</div>' if hint else ""
-
-        cards_html.append(f"""
-        <div class="sat-metric-box">
-            <div class="sat-metric-label">{lbl}</div>
-            <div class="sat-metric-value">{val}</div>
-            {hint_html}
-        </div>
-        """)
+        cards_html.append(
+            f'<div class="sat-metric-box">'
+            f'<div class="sat-metric-label">{lbl}</div>'
+            f'<div class="sat-metric-value">{val}</div>'
+            f'{hint_html}'
+            f'</div>'
+        )
 
     return f'<div class="sat-metrics-grid">{"".join(cards_html)}</div>'
 
@@ -160,19 +151,20 @@ def render_file_badge(filename: str, meta: Any, modality_val: str = "Optical", s
     dim_str = f"{meta.width} × {meta.height} px" if meta and meta.width else "Raster"
     bands_str = f"{meta.band_count} Bands" if meta and meta.band_count else ""
 
-    return f"""
-    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; background: rgba(18, 26, 46, 0.75); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; margin-bottom: 0.55rem;">
-        <div style="display: flex; align-items: center; gap: 0.55rem;">
-            <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
-            <span style="font-weight: 700; color: #34d399; font-size: 0.75rem; font-family: var(--sat-font-mono); letter-spacing: 0.05em;">● {html.escape(slot_label)}</span>
-            <span style="font-weight: 600; color: #f8fafc; font-size: 0.82rem; margin-left: 0.35rem;">{html.escape(filename)}</span>
-        </div>
-        <div style="font-family: var(--sat-font-mono); font-size: 0.7rem; color: #94a3b8; display: flex; gap: 0.55rem;">
-            <span>{dim_str}</span>
-            <span>•</span>
-            <span>{bands_str}</span>
-            <span>•</span>
-            <span style="color: #38bdf8;">{html.escape(crs_str)}</span>
-        </div>
-    </div>
-    """
+    return (
+        '<div style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; background: rgba(18, 26, 46, 0.75); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; margin-bottom: 0.55rem;">'
+        '<div style="display: flex; align-items: center; gap: 0.55rem;">'
+        '<span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>'
+        f'<span style="font-weight: 700; color: #34d399; font-size: 0.75rem; font-family: var(--sat-font-mono); letter-spacing: 0.05em;">● {html.escape(slot_label)}</span>'
+        f'<span style="font-weight: 600; color: #f8fafc; font-size: 0.82rem; margin-left: 0.35rem;">{html.escape(filename)}</span>'
+        '</div>'
+        '<div style="font-family: var(--sat-font-mono); font-size: 0.7rem; color: #94a3b8; display: flex; gap: 0.55rem;">'
+        f'<span>{html.escape(dim_str)}</span>'
+        '<span>•</span>'
+        f'<span>{html.escape(bands_str)}</span>'
+        '<span>•</span>'
+        f'<span style="color: #38bdf8;">{html.escape(crs_str)}</span>'
+        '</div>'
+        '</div>'
+    )
+

@@ -539,16 +539,13 @@ if result:
         if stats_ev and stats_ev.data:
             s_data = stats_ev.data
             st.markdown(
-                """
-                <div class="sat-card">
-                    <div class="sat-card-header">
-                        <div>
-                            <div class="sat-card-title"><span>🛰️</span> BI-TEMPORAL CHANGE DETECTION</div>
-                            <div style="font-size:0.75rem; color:#94a3b8; margin-top:0.2rem;">AI-powered comparison of satellite observations</div>
-                        </div>
-                        <div class="sat-card-badge">OPEN-CD BIT RESNET-18</div>
-                    </div>
-                """,
+                '<div class="sat-card-header">'
+                '<div>'
+                '<div class="sat-card-title"><span>🛰️</span> BI-TEMPORAL CHANGE DETECTION</div>'
+                '<div style="font-size:0.75rem; color:#94a3b8; margin-top:0.2rem;">AI-powered comparison of satellite observations</div>'
+                '</div>'
+                '<div class="sat-card-badge">OPEN-CD BIT RESNET-18</div>'
+                '</div>',
                 unsafe_allow_html=True,
             )
 
@@ -607,7 +604,6 @@ if result:
                     if img_ch:
                         st.image(img_ch, caption=f"Neural Overlay: {lbl_ch}", use_container_width=True)
 
-            st.markdown("</div>", unsafe_allow_html=True)
 
         # ---------------------------------------------------------------------
         # LAND-COVER CLASSIFICATION RESULTS
@@ -621,16 +617,13 @@ if result:
             top_pred_prob = lc_data.get("top_5_predictions", [{}])[0].get("probability", 0.0)
 
             st.markdown(
-                """
-                <div class="sat-card">
-                    <div class="sat-card-header">
-                        <div>
-                            <div class="sat-card-title"><span>🌿</span> LAND-COVER CLASSIFICATION</div>
-                            <div style="font-size:0.75rem; color:#94a3b8; margin-top:0.2rem;">Multispectral deep land-cover categorization</div>
-                        </div>
-                        <div class="sat-card-badge">BIGEARTHNET V2 RESNET-50</div>
-                    </div>
-                """,
+                '<div class="sat-card-header">'
+                '<div>'
+                '<div class="sat-card-title"><span>🌿</span> LAND-COVER CLASSIFICATION</div>'
+                '<div style="font-size:0.75rem; color:#94a3b8; margin-top:0.2rem;">Multispectral deep land-cover categorization</div>'
+                '</div>'
+                '<div class="sat-card-badge">BIGEARTHNET V2 RESNET-50</div>'
+                '</div>',
                 unsafe_allow_html=True,
             )
 
@@ -683,7 +676,6 @@ if result:
                 else:
                     st.info(f"No category exceeded the selected threshold of {lc_data.get('threshold', 0.10):.2f}.")
 
-            st.markdown("</div>", unsafe_allow_html=True)
 
         # ---------------------------------------------------------------------
         # MULTI-LAYER INSPECTION TABS & ARTIFACT DOWNLOADS
@@ -813,12 +805,14 @@ if result:
                 st.warning(f"⚠️ {unc}")
 
     with st.expander("▼ INPUT VALIDATION", expanded=False):
-        if result.validation.status == ValidationStatus.VALID:
+        if result.validation.status == ValidationStatus.PASS:
             st.success("✓ All ingested rasters passed geospatial format, band-count, and coordinate validation.")
         else:
             st.warning(f"Validation Status: {result.validation.status.value.upper()}")
-            for err in result.validation.errors:
-                st.error(f"• {err}")
+            for check in result.validation.checks:
+                if check.status != ValidationStatus.PASS:
+                    st.warning(f"• [{check.code}] {check.message}")
+
 
     with st.expander("▼ PROCESSING TRACE", expanded=False):
         trace_rows = []
