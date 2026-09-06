@@ -1,3 +1,4 @@
+import html
 import json
 from pathlib import Path
 import tempfile
@@ -13,19 +14,33 @@ from satquery.domain.schemas import (
     SlotAssignment,
     ValidationStatus,
 )
+from satquery.models.manager import get_resource_manager
 from satquery.preprocess.preview import generate_preview_image
 from satquery.preprocess.raster import (
     assess_image_quality,
     detect_modality,
     inspect_raster,
 )
+from satquery.ui import (
+    SPACE_THEME_CSS,
+    render_file_badge,
+    render_header,
+    render_hero,
+    render_pipeline_flow,
+    render_telemetry_hud,
+    render_top5_bars,
+)
 
+# Page configuration
 st.set_page_config(
-    page_title="SatQuery AI — Multi-Model Satellite Intelligence",
+    page_title="SatQuery AI — Satellite Intelligence Platform",
     page_icon="🛰️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
+
+# Inject Aerospace Master Stylesheet
+st.markdown(SPACE_THEME_CSS, unsafe_allow_html=True)
 
 TEMP_UPLOAD_DIR = Path(tempfile.gettempdir()) / "satquery_uploads"
 TEMP_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -46,47 +61,48 @@ if "last_result" not in st.session_state:
 if "current_query" not in st.session_state:
     st.session_state.current_query = ""
 
+# Query Hardware Telemetry
+rm = get_resource_manager()
+cuda_avail = rm.has_cuda()
+reg = AgentController().model_registry
+ready_count = sum(1 for _, a in reg.list_models() if a.status == "ready")
+total_count = len(reg.list_models())
 
-# -------------------------------------------------------------
-# HEADER
-# -------------------------------------------------------------
-st.title("🛰️ SATQUERY AI — Satellite Intelligence Platform")
-st.markdown("### **Multi-Modal Earth Observation & Specialist AI Inference**")
+# -----------------------------------------------------------------------------
+# TOP NAVIGATION BAR
+# -----------------------------------------------------------------------------
 st.markdown(
-    "*Agentic remote-sensing query interpretation, raster validation, and specialist neural network inference. "
-    "Features Open-CD BIT bi-temporal change detection, BigEarthNet land-cover classification, and GeoChat VLM integration.*"
+    render_header(cuda_available=cuda_avail, active_model_count=ready_count),
+    unsafe_allow_html=True,
 )
-st.divider()
 
+# -----------------------------------------------------------------------------
+# MISSION HERO BANNER
+# -----------------------------------------------------------------------------
+st.markdown(render_hero(), unsafe_allow_html=True)
 
-# -------------------------------------------------------------
-# SIDEBAR: CONFIGURATION & SYSTEM STATUS
-# -------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# SIDEBAR: ADVANCED TELEMETRY & CACHE
+# -----------------------------------------------------------------------------
 with st.sidebar:
-    st.header("⚙️ System Status")
-    
-    from satquery.models.manager import get_resource_manager
-    rm = get_resource_manager()
-    cuda_avail = rm.has_cuda()
-    device_name = "NVIDIA CUDA" if cuda_avail else "CPU Fallback"
-
+    st.markdown("### ⚙️ Mission Telemetry")
+    device_name = "NVIDIA CUDA" if cuda_avail else "CPU Fallback Engine"
     st.markdown(f"**Execution Hardware:** `{device_name}`")
     if cuda_avail:
         vram = rm.get_vram_info()
         st.caption(f"Allocated: {vram.get('allocated_mb', 0):.0f} MB / Total: {vram.get('total_mb', 0):.0f} MB")
     else:
-        st.caption("Host CPU execution active. No GPU OOM risk.")
+        st.caption("Host CPU execution active. Low memory overhead.")
 
     st.markdown("---")
-    st.subheader("Specialist Models Catalog")
-    reg = AgentController().model_registry
+    st.markdown("### 🛰️ Specialist Models")
     for mid, adapter in reg.list_models():
         st_icon = "🟢" if adapter.status == "ready" else "🟡" if adapter.status == "unloaded" else "⚪"
         st.markdown(f"{st_icon} **{adapter.name}** (`{mid}`)")
         st.caption(f"Status: {adapter.status.upper()} | Caps: {', '.join(adapter.capabilities)}")
 
     st.markdown("---")
-    if st.button("🗑️ Clear Session & Cache", use_container_width=True):
+    if st.button("🗑️ Reset Session Cache", use_container_width=True):
         st.session_state.history.clear()
         st.session_state.last_result = None
         st.session_state.current_query = ""
@@ -94,27 +110,42 @@ with st.sidebar:
         st.rerun()
 
 
-# -------------------------------------------------------------
-# 1. DATA INPUT & MODE SELECTION
-# -------------------------------------------------------------
-st.header("1. Data Input & Workflow Mode")
+# -----------------------------------------------------------------------------
+# 1. DATA INPUT & WORKFLOW MODE
+# -----------------------------------------------------------------------------
+st.markdown(
+    """
+    <div class="sat-card">
+        <div class="sat-card-header">
+            <div class="sat-card-title"><span>📡</span> Step 1: Select Earth Observation Workflow & Ingest Imagery</div>
+            <div class="sat-card-badge">INPUT TELEMETRY</div>
+        </div>
+    """,
+    unsafe_allow_html=True,
+)
 
 mode_selection = st.radio(
     "Select Workflow Mode:",
-    ["Single Satellite Image", "Bi-Temporal Pair (Change Detection)", "Optical + SAR Pair"],
+    [
+        "🔄 Bi-Temporal Pair (Open-CD BIT Change Detection)",
+        "📷 Single Satellite Scene (BigEarthNet Land-Cover / Scene VQA)",
+        "📡 Optical + SAR Multimodal Fusion",
+    ],
     horizontal=True,
 )
 
 slots: list[SlotAssignment] = []
 slot_files: dict[str, Path] = {}
+analysis_kwargs = {}
 
-col_in1, col_in2 = st.columns(2)
-
-if mode_selection == "Single Satellite Image":
+if "Single Satellite Scene" in mode_selection:
     input_mode = InputMode.I1_SINGLE_OPTICAL
-    with col_in1:
+    col_upload, col_params = st.columns([1.8, 1.2])
+
+    with col_upload:
+        st.markdown("##### 📥 Ingest Scene (Sentinel-2, Landsat, or GeoTIFF)")
         single_upload = st.file_uploader(
-            "Upload Satellite Scene (GeoTIFF / TIFF):",
+            "Drop Satellite Scene (GeoTIFF / TIFF):",
             type=["tif", "tiff", "geotiff"],
             key="single_uploader",
         )
@@ -123,26 +154,27 @@ if mode_selection == "Single Satellite Image":
             slots.append(SlotAssignment(slot_id="image", file_path=str(p)))
             slot_files["image"] = p
 
-    st.markdown("##### ⚙️ Single-Image Model Parameters")
-    p_col1, p_col2 = st.columns(2)
-    with p_col1:
+    with col_params:
+        st.markdown("##### ⚙️ Classification Parameters")
         classification_threshold = st.slider(
-            "Land-Cover Confidence Threshold:",
-            min_value=0.10,
+            "Confidence Threshold:",
+            min_value=0.05,
             max_value=0.90,
-            value=0.30,
+            value=0.10,
             step=0.05,
-            help="Minimum class probability to report in BigEarthNet scene classification (default: 0.30).",
+            help="Minimum class probability to report in BigEarthNet scene classification (default: 0.10).",
         )
-    with p_col2:
-        st.markdown("**Target Tasks:**")
-        st.caption("• Scene Land-Cover Classification (BigEarthNet)\n• Visual Question Answering (GeoChat)\n• Referring Expression Grounding")
+        analysis_kwargs["threshold"] = classification_threshold
+        st.caption("• Pretrained on BigEarthNet v2.0 (reBEN) Sentinel-2 19 Corine Land Cover categories")
 
-elif mode_selection == "Bi-Temporal Pair (Change Detection)":
+elif "Bi-Temporal Pair" in mode_selection:
     input_mode = InputMode.I4_BITEMPORAL_PAIR
-    with col_in1:
+    col_t0, col_t1 = st.columns(2)
+
+    with col_t0:
+        st.markdown("##### ⏳ T0 — Baseline Scene (Before)")
         t0_upload = st.file_uploader(
-            "Upload 'Before' Image (Date T0):",
+            "Upload Date T0 (GeoTIFF / TIFF):",
             type=["tif", "tiff", "geotiff"],
             key="t0_uploader",
         )
@@ -150,9 +182,11 @@ elif mode_selection == "Bi-Temporal Pair (Change Detection)":
             p0 = save_upload(t0_upload)
             slots.append(SlotAssignment(slot_id="t0", file_path=str(p0)))
             slot_files["t0"] = p0
-    with col_in2:
+
+    with col_t1:
+        st.markdown("##### ⌛ T1 — Target Scene (After)")
         t1_upload = st.file_uploader(
-            "Upload 'After' Image (Date T1):",
+            "Upload Date T1 (GeoTIFF / TIFF):",
             type=["tif", "tiff", "geotiff"],
             key="t1_uploader",
         )
@@ -161,74 +195,79 @@ elif mode_selection == "Bi-Temporal Pair (Change Detection)":
             slots.append(SlotAssignment(slot_id="t1", file_path=str(p1)))
             slot_files["t1"] = p1
 
-    st.markdown("##### ⚙️ Change Detection Parameters")
-    cd_col1, cd_col2, cd_col3, cd_col4 = st.columns(4)
-    with cd_col1:
-        change_threshold = st.slider(
-            "Change Threshold:",
-            min_value=0.05,
-            max_value=0.95,
-            value=0.50,
-            step=0.05,
-            help="Probability cutoff for classifying a pixel as changed (default 0.50).",
-        )
-    with cd_col2:
-        min_change_region_pixels = st.slider(
-            "Min Region Size (px):",
-            min_value=5,
-            max_value=200,
-            value=20,
-            step=5,
-            help="Filter out small noise clusters smaller than this pixel count (default 20 px).",
-        )
-    with cd_col3:
-        st.markdown("**Tiled Inference:** 256×256 tiles")
-        st.caption("Sliding-window with cosine blending (no downsampling)")
-    with cd_col4:
-        st.markdown("**Tile Overlap:** 25% (64 px)")
-        st.caption("Seamless reconstruction without boundary seams")
+    with st.expander("⚙️ Advanced Change Detection Parameters", expanded=False):
+        cd_col1, cd_col2, cd_col3, cd_col4 = st.columns(4)
+        with cd_col1:
+            change_threshold = st.slider(
+                "Change Cutoff Threshold:",
+                min_value=0.05,
+                max_value=0.95,
+                value=0.50,
+                step=0.05,
+                help="Probability cutoff for classifying a pixel as changed (default 0.50).",
+            )
+            analysis_kwargs["change_threshold"] = change_threshold
+        with cd_col2:
+            min_change_region_pixels = st.slider(
+                "Min Region Noise Filter (px):",
+                min_value=5,
+                max_value=200,
+                value=20,
+                step=5,
+                help="Filter out small noise clusters smaller than this pixel count (default 20 px).",
+            )
+            analysis_kwargs["min_change_region_pixels"] = min_change_region_pixels
+        with cd_col3:
+            st.markdown("**Sliding-Window Tile:** `256 × 256`")
+            st.caption("Cosine-weighted blending preserves full resolution")
+        with cd_col4:
+            st.markdown("**Tile Overlap:** `25% (64 px)`")
+            st.caption("Seamless tile boundaries with no visual seams")
 
-else:  # Optical + SAR Pair
+else:  # Optical + SAR Multimodal
     input_mode = InputMode.I3_OPTICAL_SAR_PAIR
-    with col_in1:
+    col_opt, col_sar = st.columns(2)
+    with col_opt:
+        st.markdown("##### 🌈 Optical / Multispectral Sensor")
         opt_upload = st.file_uploader(
-            "Upload Optical / Multispectral Image:",
+            "Upload Optical Image:",
             type=["tif", "tiff", "geotiff"],
             key="opt_uploader",
         )
         if opt_upload:
             p_opt = save_upload(opt_upload)
-            slots.append(
-                SlotAssignment(
-                    slot_id="optical",
-                    file_path=str(p_opt),
-                    declared_modality=Modality.OPTICAL,
-                )
-            )
+            slots.append(SlotAssignment(slot_id="optical", file_path=str(p_opt), declared_modality=Modality.OPTICAL))
             slot_files["optical"] = p_opt
-    with col_in2:
+
+    with col_sar:
+        st.markdown("##### 🛰️ Synthetic Aperture Radar (SAR) Sensor")
         sar_upload = st.file_uploader(
-            "Upload Synthetic Aperture Radar (SAR) Image:",
+            "Upload SAR Radar Image:",
             type=["tif", "tiff", "geotiff"],
             key="sar_uploader",
         )
         if sar_upload:
             p_sar = save_upload(sar_upload)
-            slots.append(
-                SlotAssignment(
-                    slot_id="sar",
-                    file_path=str(p_sar),
-                    declared_modality=Modality.SAR,
-                )
-            )
+            slots.append(SlotAssignment(slot_id="sar", file_path=str(p_sar), declared_modality=Modality.SAR))
             slot_files["sar"] = p_sar
 
+st.markdown("</div>", unsafe_allow_html=True)
 
-# -------------------------------------------------------------
-# 2. IMAGE METADATA & VISUAL PREVIEWS
-# -------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# IMAGE TELEMETRY & PREVIEW CARDS
+# -----------------------------------------------------------------------------
 if slots:
-    st.header("2. Raster Metadata & Scene Preview")
+    st.markdown(
+        """
+        <div class="sat-card">
+            <div class="sat-card-header">
+                <div class="sat-card-title"><span>🔍</span> Raster Metadata & Scene Verification</div>
+                <div class="sat-card-badge">GEOSPATIAL VERIFIED</div>
+            </div>
+        """,
+        unsafe_allow_html=True,
+    )
     preview_cols = st.columns(len(slots))
 
     for idx, slot in enumerate(slots):
@@ -238,98 +277,119 @@ if slots:
         modality = detect_modality(meta)
 
         with preview_cols[idx]:
-            st.markdown(f"#### Slot: `{slot.slot_id}` ({meta.filename})")
-
+            st.markdown(render_file_badge(meta.filename, meta, modality.value), unsafe_allow_html=True)
             img_preview, label_txt = generate_preview_image(file_p, max_side=400)
             if img_preview:
-                st.image(img_preview, caption=label_txt, use_container_width=True)
+                st.image(img_preview, caption=f"Preview: {label_txt}", use_container_width=True)
             else:
                 st.warning(f"Preview unavailable: {label_txt}")
 
-            meta_data = {
-                "Dimensions": f"{meta.width} × {meta.height}" if meta.width else "Not available",
-                "Bands": str(meta.band_count) if meta.band_count else "Not available",
-                "Data Type": str(meta.dtype) if meta.dtype else "Not available",
-                "Format": str(meta.format) if meta.format else "Not available",
-                "CRS": str(meta.crs) if meta.crs else "Not available",
-                "Resolution": f"{meta.resolution[0]:.6f}, {meta.resolution[1]:.6f}" if meta.resolution else "Not available",
-                "Detected Modality": modality.value,
-                "Image Quality": f"{quality.level.value} ({', '.join(quality.reasons)})",
-            }
-            st.table(meta_data)
-else:
-    st.info("Upload satellite raster file(s) above to inspect real metadata and preview scenes.")
+            with st.expander("Detailed Telemetry Table", expanded=False):
+                st.dataframe(
+                    [
+                        {"Metric": "Dimensions", "Value": f"{meta.width} × {meta.height} px"},
+                        {"Metric": "Bands", "Value": str(meta.band_count)},
+                        {"Metric": "Data Type", "Value": str(meta.dtype)},
+                        {"Metric": "CRS", "Value": str(meta.crs)},
+                        {"Metric": "Modality", "Value": modality.value.upper()},
+                        {"Metric": "Quality Level", "Value": quality.level.value.upper()},
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
+                )
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
-# -------------------------------------------------------------
-# 3. NATURAL LANGUAGE QUERY
-# -------------------------------------------------------------
-st.header("3. Natural Language Query")
-
-st.markdown("**Example queries (click to populate):**")
-if mode_selection == "Single Satellite Image":
-    ex_cols = st.columns(4)
-    with ex_cols[0]:
-        if st.button("Classify land-cover", use_container_width=True):
-            st.session_state.current_query = "Classify the land-cover categories visible in this satellite scene."
-    with ex_cols[1]:
-        if st.button("Check for roads (VQA)", use_container_width=True):
-            st.session_state.current_query = "Is there a road or runway in this image?"
-    with ex_cols[2]:
-        if st.button("Describe the scene", use_container_width=True):
-            st.session_state.current_query = "Describe the scene and visible landscape features."
-    with ex_cols[3]:
-        if st.button("Locate water / buildings", use_container_width=True):
-            st.session_state.current_query = "Locate and highlight the water bodies in this scene."
-else:
-    ex_cols = st.columns(3)
-    with ex_cols[0]:
-        if st.button("What changed between dates?", use_container_width=True):
-            st.session_state.current_query = "What changed between these two dates?"
-    with ex_cols[1]:
-        if st.button("Identify new construction", use_container_width=True):
-            st.session_state.current_query = "Identify areas where building construction occurred between T0 and T1."
-    with ex_cols[2]:
-        if st.button("Compare two images", use_container_width=True):
-            st.session_state.current_query = "Compare these two satellite images and map significant changes."
-
-query_text = st.text_input(
-    "Enter your question or task instruction for the satellite imagery:",
-    value=st.session_state.current_query,
-    placeholder="e.g., Classify the land-cover categories visible in this scene.",
+# -----------------------------------------------------------------------------
+# 2. NATURAL LANGUAGE QUERY COMPOSER
+# -----------------------------------------------------------------------------
+st.markdown(
+    """
+    <div class="sat-card">
+        <div class="sat-card-header">
+            <div class="sat-card-title"><span>🧠</span> Step 2: What do you want to know about your imagery?</div>
+            <div class="sat-card-badge">NATURAL LANGUAGE AGENT</div>
+        </div>
+    """,
+    unsafe_allow_html=True,
 )
 
-run_button = st.button("🚀 Run Agent Analysis", type="primary", use_container_width=True)
+st.markdown("**Prompt Suggestions (Click to Populate):**")
 
+if "Single Satellite Scene" in mode_selection:
+    q_col1, q_col2, q_col3, q_col4 = st.columns(4)
+    with q_col1:
+        if st.button("🌿 Classify Land Cover", use_container_width=True):
+            st.session_state.current_query = "Classify the land cover in this satellite image and give me the confidence scores."
+            st.rerun()
+    with q_col2:
+        if st.button("🛣️ Check for Roads (VQA)", use_container_width=True):
+            st.session_state.current_query = "Is there a road or runway in this image?"
+            st.rerun()
+    with q_col3:
+        if st.button("🛰️ Describe Scene", use_container_width=True):
+            st.session_state.current_query = "Describe the scene and visible landscape features."
+            st.rerun()
+    with q_col4:
+        if st.button("💧 Locate Water & Wetlands", use_container_width=True):
+            st.session_state.current_query = "Locate and highlight the water bodies in this scene."
+            st.rerun()
+else:
+    q_col1, q_col2, q_col3, q_col4 = st.columns(4)
+    with q_col1:
+        if st.button("🔄 Detect Changes", use_container_width=True):
+            st.session_state.current_query = "What changed between these two satellite dates?"
+            st.rerun()
+    with q_col2:
+        if st.button("🏗️ Find Building Construction", use_container_width=True):
+            st.session_state.current_query = "Identify areas where building construction occurred between T0 and T1."
+            st.rerun()
+    with q_col3:
+        if st.button("📐 Map Major Change Regions", use_container_width=True):
+            st.session_state.current_query = "Where did change occur and what are the major changed regions?"
+            st.rerun()
+    with q_col4:
+        if st.button("🌐 Compare Two Images", use_container_width=True):
+            st.session_state.current_query = "Compare these two satellite images and map significant changes."
+            st.rerun()
+
+query_text = st.text_input(
+    "Query input:",
+    value=st.session_state.current_query,
+    placeholder="e.g., What changed between these two satellite dates and where are the major change regions?",
+    label_visibility="collapsed",
+)
+
+st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
+run_button = st.button("✨ RUN SATELLITE INTELLIGENCE", type="primary", use_container_width=True)
+st.markdown("</div>", unsafe_allow_html=True)
+
+
+# -----------------------------------------------------------------------------
+# EXECUTION ORCHESTRATION
+# -----------------------------------------------------------------------------
 if run_button:
     if not slots:
-        st.error("Please upload at least one image before running analysis.")
+        st.error("⚠️ Please upload at least one satellite raster before running analysis.")
     elif not query_text.strip():
-        st.error("Please enter a natural-language query or select an example above.")
+        st.error("⚠️ Please enter a natural-language query or select a prompt suggestion above.")
     else:
         controller = AgentController()
-        analysis_kwargs = {}
-        if mode_selection == "Bi-Temporal Pair (Change Detection)":
-            analysis_kwargs["change_threshold"] = change_threshold
-            analysis_kwargs["min_change_region_pixels"] = min_change_region_pixels
-        elif mode_selection == "Single Satellite Image":
-            analysis_kwargs["threshold"] = classification_threshold
-
         try:
-            with st.status("Executing SatQuery AI Multi-Model Intelligence...", expanded=True) as status_box:
-                st.write("🔍 Stage 1: Inspecting rasters and verifying coordinate reference systems...")
-                time.sleep(0.05)
-                st.write("🧠 Stage 2: Parsing query intent and resolving specialist model pipeline...")
-                time.sleep(0.05)
-                st.write("🛰️ Stage 3: Executing neural inference and calculating spatial statistics...")
+            with st.status("🛰️ Executing Autonomous Satellite Intelligence...", expanded=True) as status_box:
+                st.write("🔍 Stage 1: Inspecting rasters & verifying geospatial coordinate systems...")
+                time.sleep(0.04)
+                st.write("🧠 Stage 2: Parsing natural-language query intent & resolving specialist model...")
+                time.sleep(0.04)
+                st.write("🛰️ Stage 3: Executing specialist neural network inference & spatial statistics...")
                 result: AnalysisResult = controller.analyze(
                     query=query_text.strip(),
                     slots=slots,
                     input_mode=input_mode,
                     **analysis_kwargs,
                 )
-                st.write("📊 Stage 4: Formatting artifacts, GeoJSON vectors, and structured intelligence report...")
-                status_box.update(label="Analysis completed successfully!", state="complete", expanded=False)
+                st.write("📦 Stage 4: Compiling GeoTIFF masks, GeoJSON vector polygons & intelligence report...")
+                status_box.update(label="✨ Analysis Completed Successfully!", state="complete", expanded=False)
 
             st.session_state.last_result = result
             st.session_state.history.append({
@@ -339,219 +399,326 @@ if run_button:
                 "result_text": result.result_text,
             })
         except Exception as exc:
-            st.error(f"❌ Analysis execution error: {str(exc)}")
+            st.error(f"❌ Analysis Execution Error: {str(exc)}")
 
 
-# -------------------------------------------------------------
-# 4. RESULTS DISPLAY
-# -------------------------------------------------------------
-result = st.session_state.last_result
+# -----------------------------------------------------------------------------
+# 3. RESULTS & GEOSPATIAL INTELLIGENCE DASHBOARD
+# -----------------------------------------------------------------------------
+result: Optional[AnalysisResult] = st.session_state.last_result
 
 if result:
-    st.divider()
-
-    # 4. AGENT PLAN
-    st.header("4. Agent Execution Plan")
     plan = result.plan
+    selected_mid = plan.selected_models[0] if plan.selected_models else "specialist"
+    model_obj = reg.get(selected_mid)
+    selected_mname = model_obj.name if model_obj else selected_mid
 
-    col_p1, col_p2, col_p3 = st.columns(3)
-    with col_p1:
-        st.metric("Resolved Task", plan.task)
-        st.metric("Thematic Domain", plan.theme.value)
-    with col_p2:
-        st.markdown(f"**Required Inputs:** {', '.join(plan.required_inputs)}")
-        st.markdown(f"**Input Mode:** {plan.input_mode.value}")
-        if plan.blocked:
-            st.error(f"⛔ **Execution Blocked:** {plan.block_reason}")
-        else:
-            st.success("✅ **Plan Status:** Compatible")
-    with col_p3:
-        reg = AgentController().model_registry
-        model_statuses = []
-        for mid in plan.selected_models:
-            m = reg.get(mid)
-            st_text = m.status.upper() if m else "UNKNOWN"
-            model_statuses.append(f"`{mid}` ({st_text})")
-        st.markdown(f"**Selected Model(s):** {', '.join(model_statuses)}")
-        st.markdown(f"**Selected Tools:** {', '.join(plan.selected_tools)}")
+    # AI Routing Pipeline Visualization
+    st.markdown("### 🧭 Autonomous Routing Pipeline Execution")
+    st.markdown(
+        render_pipeline_flow(
+            query=result.query,
+            task=plan.task,
+            model_name=selected_mname,
+            model_id=selected_mid,
+            tools=plan.selected_tools,
+        ),
+        unsafe_allow_html=True,
+    )
 
-    # 5. ANALYSIS RESULT & SUMMARY
-    st.header("5. Technical Intelligence Report")
+    # Status check for blocked or unconfigured models
     if "Specialist model not configured" in result.result_text:
-        st.warning(f"### {result.result_text}")
+        st.warning(f"### ⚠️ {result.result_text}")
     elif "Validation failed" in result.result_text or "Agent planning stopped" in result.result_text:
-        st.error(f"### {result.result_text}")
+        st.error(f"### ❌ {result.result_text}")
     else:
-        st.markdown(result.result_text)
-
-        # Show Change Detection metric cards if present
+        # ---------------------------------------------------------------------
+        # BI-TEMPORAL CHANGE DETECTION RESULTS
+        # ---------------------------------------------------------------------
         stats_ev = next((e for e in result.evidence if e.title == "Bi-Temporal Change Statistics"), None)
+        mask_art = next((e for e in result.evidence if "Binary Change Mask" in e.title), None)
+        prob_art = next((e for e in result.evidence if "Probability Map" in e.title), None)
+        vis_art = next((e for e in result.evidence if e.title == "Change Map Visual Overlay"), None)
+        regions_art = next((e for e in result.evidence if "Bounding Boxes" in e.title), None)
+        geojson_art = next((e for e in result.evidence if "GeoJSON" in e.title), None)
+
         if stats_ev and stats_ev.data:
             s_data = stats_ev.data
-            st.markdown("#### 📊 Change Detection Quantitative Metrics")
-            r_col1, r_col2, r_col3, r_col4, r_col5 = st.columns(5)
-            with r_col1:
-                if s_data.get("changed_area_m2") is not None:
-                    st.metric("Changed Area", f"{s_data.get('changed_area_hectares', 0.0):,.2f} ha", help=f"{s_data.get('changed_area_m2', 0):,.1f} m²")
-                else:
-                    st.metric("Changed Area", "N/A (Unprojected)")
-            with r_col2:
-                st.metric("Change %", f"{s_data.get('percentage_changed', 0.0)}%")
-            with r_col3:
-                st.metric("Change Regions", f"{s_data.get('regions_count', 0):,}")
-            with r_col4:
-                st.metric("Confidence", f"{result.confidence.score*100:.1f}%" if result.confidence.score is not None else "N/A")
-            with r_col5:
-                t_total = s_data.get("timings_seconds", {}).get("total")
-                st.metric("Processing Time", f"{t_total:.2f}s" if t_total is not None else "N/A")
+            st.markdown(
+                """
+                <div class="sat-card">
+                    <div class="sat-card-header">
+                        <div class="sat-card-title"><span>🛰️</span> Bi-Temporal Change Detection Metrics</div>
+                        <div class="sat-card-badge">OPEN-CD BIT RESNET-18</div>
+                    </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-        # Show Land-Cover metric cards if present
+            # Quantitative Metrics HUD
+            hud_metrics = [
+                {
+                    "label": "Changed Area",
+                    "value": f"{s_data.get('changed_area_hectares', 0.0):,.2f} ha" if s_data.get("changed_area_m2") is not None else "Unprojected",
+                    "hint": f"{s_data.get('changed_area_m2', 0):,.1f} m²" if s_data.get("changed_area_m2") is not None else "Pixel space",
+                },
+                {
+                    "label": "Change Ratio",
+                    "value": f"{s_data.get('percentage_changed', 0.0):.2f}%",
+                    "hint": "Ratio of changed pixels",
+                },
+                {
+                    "label": "Change Clusters",
+                    "value": f"{s_data.get('regions_count', 0):,}",
+                    "hint": "Polygonized regions",
+                },
+                {
+                    "label": "AI Confidence",
+                    "value": f"{result.confidence.score*100:.1f}%" if result.confidence.score is not None else "N/A",
+                    "hint": result.confidence.method or "Calibrated",
+                },
+                {
+                    "label": "Processing Time",
+                    "value": f"{s_data.get('timings_seconds', {}).get('total', 0.0):.2f}s",
+                    "hint": "Tiled inference + polygonization",
+                },
+            ]
+            st.markdown(render_telemetry_hud(hud_metrics), unsafe_allow_html=True)
+
+            # 3-Column Comparative Board
+            st.markdown("##### 📷 Comparative Geospatial Viewer (T0 Baseline vs T1 Target vs AI Change Vector)")
+            col_b1, col_b2, col_b3 = st.columns(3)
+
+            with col_b1:
+                st.markdown("<div style='font-size:0.78rem; font-weight:700; color:#38bdf8; text-transform:uppercase;'>Baseline (T0)</div>", unsafe_allow_html=True)
+                if "t0" in slot_files and slot_files["t0"].exists():
+                    img0, lbl0 = generate_preview_image(slot_files["t0"], max_side=500)
+                    if img0:
+                        st.image(img0, caption=f"T0: {lbl0}", use_container_width=True)
+
+            with col_b2:
+                st.markdown("<div style='font-size:0.78rem; font-weight:700; color:#38bdf8; text-transform:uppercase;'>Observation (T1)</div>", unsafe_allow_html=True)
+                if "t1" in slot_files and slot_files["t1"].exists():
+                    img1, lbl1 = generate_preview_image(slot_files["t1"], max_side=500)
+                    if img1:
+                        st.image(img1, caption=f"T1: {lbl1}", use_container_width=True)
+
+            with col_b3:
+                st.markdown("<div style='font-size:0.78rem; font-weight:700; color:#f43f5e; text-transform:uppercase;'>AI Detected Change Overlay</div>", unsafe_allow_html=True)
+                target_art = vis_art or mask_art
+                if target_art and target_art.file_path and Path(target_art.file_path).exists():
+                    img_ch, lbl_ch = generate_preview_image(Path(target_art.file_path), max_side=500)
+                    if img_ch:
+                        st.image(img_ch, caption=f"Change Map: {lbl_ch}", use_container_width=True)
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        # ---------------------------------------------------------------------
+        # LAND-COVER CLASSIFICATION RESULTS
+        # ---------------------------------------------------------------------
         lc_stats = next((e for e in result.evidence if e.title == "Land-Cover Classification Statistics"), None)
+        lc_chart = next((e for e in result.evidence if "Land-Cover Probability Distribution" in e.title), None)
+
         if lc_stats and lc_stats.data:
             lc_data = lc_stats.data
-            st.markdown("#### 🌿 Land-Cover Classification Metrics")
-            l_col1, l_col2, l_col3, l_col4 = st.columns(4)
-            with l_col1:
-                st.metric("Model", lc_data.get("model", "BigEarthNet v2 ResNet-50"))
-            with l_col2:
-                st.metric("Threshold", f"{lc_data.get('threshold', 0.30):.2f}")
-            with l_col3:
-                st.metric("Detected Classes", f"{lc_data.get('detected_classes_count', 0)}")
-            with l_col4:
-                st.metric("Top Confidence", f"{result.confidence.score*100:.1f}%" if result.confidence.score is not None else "N/A")
+            st.markdown(
+                """
+                <div class="sat-card">
+                    <div class="sat-card-header">
+                        <div class="sat-card-title"><span>🌿</span> Land-Cover Classification Predictions</div>
+                        <div class="sat-card-badge">BIGEARTHNET V2 RESNET-50</div>
+                    </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
+            # Telemetry Metrics HUD
+            lc_metrics = [
+                {
+                    "label": "Dominant Prediction",
+                    "value": lc_data.get("top_5_predictions", [{}])[0].get("class", "N/A"),
+                    "hint": f"Probability: {lc_data.get('top_5_predictions', [{}])[0].get('probability', 0)*100:.2f}%",
+                },
+                {
+                    "label": "Detection Threshold",
+                    "value": f"{lc_data.get('threshold', 0.10):.2f}",
+                    "hint": "Runtime filter cutoff",
+                },
+                {
+                    "label": "Classes >= Threshold",
+                    "value": str(lc_data.get("detected_classes_count", 0)),
+                    "hint": "Corine categories met",
+                },
+                {
+                    "label": "Top Confidence",
+                    "value": f"{result.confidence.score*100:.1f}%" if result.confidence.score is not None else "N/A",
+                    "hint": "Sigmoid output layer max",
+                },
+            ]
+            st.markdown(render_telemetry_hud(lc_metrics), unsafe_allow_html=True)
+
+            # Top 5 Predictions Animated Bars
             if "top_5_predictions" in lc_data and lc_data["top_5_predictions"]:
                 st.markdown("##### 🏆 Top 5 Predicted Land-Cover Categories")
-                t5_cols = st.columns(len(lc_data["top_5_predictions"]))
-                for col, item in zip(t5_cols, lc_data["top_5_predictions"]):
-                    with col:
-                        st.metric(label=item["class"], value=f"{item['probability']*100:.1f}%")
+                st.markdown(render_top5_bars(lc_data["top_5_predictions"]), unsafe_allow_html=True)
 
-    # 6. VISUAL EVIDENCE & ARTIFACTS
-    st.header("6. Visual Evidence & Generated Artifacts")
-
-    # Group evidence items
-    mask_art = next((e for e in result.evidence if "Binary Change Mask" in e.title), None)
-    prob_art = next((e for e in result.evidence if "Probability Map" in e.title), None)
-    vis_art = next((e for e in result.evidence if e.title == "Change Map Visual Overlay"), None)
-    regions_art = next((e for e in result.evidence if "Bounding Boxes" in e.title), None)
-    geojson_art = next((e for e in result.evidence if "GeoJSON" in e.title), None)
-    lc_chart = next((e for e in result.evidence if "Land-Cover Probability Distribution" in e.title), None)
-    grd_overlay = next((e for e in result.evidence if "Spatial Grounding Visual Overlay" in e.title), None)
-
-    # Dynamic Tabs
-    tab_list = []
-    tab_contents = []
-
-    if "t0" in slot_files and slot_files["t0"].exists():
-        tab_list.append("📷 T0 Image")
-        tab_contents.append(("t0", slot_files["t0"]))
-    if "t1" in slot_files and slot_files["t1"].exists():
-        tab_list.append("📷 T1 Image")
-        tab_contents.append(("t1", slot_files["t1"]))
-    if "image" in slot_files and slot_files["image"].exists() and not tab_list:
-        tab_list.append("📷 Source Scene")
-        tab_contents.append(("image", slot_files["image"]))
-
-    if prob_art and prob_art.file_path and Path(prob_art.file_path).exists():
-        tab_list.append("🌐 Change Probability")
-        tab_contents.append(("prob", Path(prob_art.file_path)))
-    if mask_art and mask_art.file_path and Path(mask_art.file_path).exists():
-        tab_list.append("⬛⬜ Binary Change Map")
-        tab_contents.append(("mask", Path(mask_art.file_path)))
-    if vis_art and vis_art.file_path and Path(vis_art.file_path).exists():
-        tab_list.append("🔴 Change Overlay")
-        tab_contents.append(("overlay", Path(vis_art.file_path)))
-    if regions_art and regions_art.file_path and Path(regions_art.file_path).exists():
-        tab_list.append("🏷️ Change Regions")
-        tab_contents.append(("regions", Path(regions_art.file_path)))
-    if lc_chart and lc_chart.file_path and Path(lc_chart.file_path).exists():
-        tab_list.append("📊 Land-Cover Classes")
-        tab_contents.append(("lc_chart", Path(lc_chart.file_path)))
-    if grd_overlay and grd_overlay.file_path and Path(grd_overlay.file_path).exists():
-        tab_list.append("🎯 Grounded Bounding Boxes")
-        tab_contents.append(("grounding", Path(grd_overlay.file_path)))
-
-    if tab_list:
-        tabs = st.tabs(tab_list)
-        for i, (kind, pth) in enumerate(tab_contents):
-            with tabs[i]:
-                img, lbl = generate_preview_image(pth, max_side=650)
-                if img:
-                    st.image(img, caption=f"{tab_list[i]} — {lbl}", use_container_width=True)
-                else:
-                    st.warning(f"Preview unavailable: {lbl}")
-
-    # Artifact Downloads Section
-    st.markdown("#### 📥 Download Output Artifacts")
-    dl_buttons = []
-    if mask_art and mask_art.file_path and Path(mask_art.file_path).exists():
-        dl_buttons.append(("Binary Mask (GeoTIFF)", mask_art.file_path, "image/tiff"))
-    if prob_art and prob_art.file_path and Path(prob_art.file_path).exists():
-        dl_buttons.append(("Probability Map (GeoTIFF)", prob_art.file_path, "image/tiff"))
-    if geojson_art and geojson_art.file_path and Path(geojson_art.file_path).exists():
-        dl_buttons.append(("Vector Regions (GeoJSON)", geojson_art.file_path, "application/geo+json"))
-    if regions_art and regions_art.file_path and Path(regions_art.file_path).exists():
-        dl_buttons.append(("Labeled Regions (PNG)", regions_art.file_path, "image/png"))
-    if lc_chart and lc_chart.file_path and Path(lc_chart.file_path).exists():
-        dl_buttons.append(("Land-Cover Chart (PNG)", lc_chart.file_path, "image/png"))
-
-    if dl_buttons:
-        dl_cols = st.columns(len(dl_buttons))
-        for idx, (label, pth, mime) in enumerate(dl_buttons):
-            with dl_cols[idx]:
-                with open(pth, "rb") as f_dl:
-                    st.download_button(
-                        f"⬇️ {label}",
-                        f_dl.read(),
-                        file_name=Path(pth).name,
-                        mime=mime,
+            # Top Classes Table & Chart
+            col_chart, col_tbl = st.columns([1.3, 1.0])
+            with col_chart:
+                if lc_chart and lc_chart.file_path and Path(lc_chart.file_path).exists():
+                    st.image(lc_chart.file_path, caption="Probability Distribution (Top Categories)", use_container_width=True)
+            with col_tbl:
+                st.markdown("##### 📋 Detected Classes (>= Threshold)")
+                if lc_data.get("detected_classes"):
+                    st.dataframe(
+                        [
+                            {"Category": c["class"], "Predicted Confidence": f"{c['probability']*100:.2f}%"}
+                            for c in lc_data["detected_classes"]
+                        ],
                         use_container_width=True,
+                        hide_index=True,
                     )
-    else:
-        st.caption("No downloadable file artifacts generated for this task.")
+                else:
+                    st.info(f"No category exceeded the selected threshold of {lc_data.get('threshold', 0.10):.2f}.")
 
-    # 7 & 8. CONFIDENCE & UNCERTAINTY
-    c_col1, c_col2 = st.columns(2)
-    with c_col1:
-        st.header("7. Confidence Estimation")
-        st.markdown(f"**Confidence Level:** {result.confidence.display_text}")
-        st.markdown(f"**Source:** {result.confidence.source}")
-        st.markdown(f"**Method:** `{result.confidence.method or 'None'}`")
-        st.markdown(f"**Reason:** *{result.confidence.reason}*")
-        st.caption("Confidence scores are calibrated from active model activations without synthetic inflation.")
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    with c_col2:
-        st.header("8. Input Uncertainty Analysis")
+        # ---------------------------------------------------------------------
+        # MULTI-LAYER INSPECTION TABS & ARTIFACT DOWNLOADS
+        # ---------------------------------------------------------------------
+        tab_list = []
+        tab_contents = []
+
+        if "t0" in slot_files and slot_files["t0"].exists():
+            tab_list.append("📷 Baseline (T0)")
+            tab_contents.append(("t0", slot_files["t0"]))
+        if "t1" in slot_files and slot_files["t1"].exists():
+            tab_list.append("📷 Target (T1)")
+            tab_contents.append(("t1", slot_files["t1"]))
+        if "image" in slot_files and slot_files["image"].exists() and not tab_list:
+            tab_list.append("📷 Source Scene")
+            tab_contents.append(("image", slot_files["image"]))
+
+        if prob_art and prob_art.file_path and Path(prob_art.file_path).exists():
+            tab_list.append("🌐 Change Heatmap")
+            tab_contents.append(("prob", Path(prob_art.file_path)))
+        if mask_art and mask_art.file_path and Path(mask_art.file_path).exists():
+            tab_list.append("⬛⬜ Binary Mask")
+            tab_contents.append(("mask", Path(mask_art.file_path)))
+        if vis_art and vis_art.file_path and Path(vis_art.file_path).exists():
+            tab_list.append("🔴 Change Overlay")
+            tab_contents.append(("overlay", Path(vis_art.file_path)))
+        if regions_art and regions_art.file_path and Path(regions_art.file_path).exists():
+            tab_list.append("🏷️ Labeled Clusters")
+            tab_contents.append(("regions", Path(regions_art.file_path)))
+
+        if tab_list:
+            with st.expander("🖼️ Multi-Layer High-Resolution Raster Inspection", expanded=False):
+                tabs = st.tabs(tab_list)
+                for i, (kind, pth) in enumerate(tab_contents):
+                    with tabs[i]:
+                        img, lbl = generate_preview_image(pth, max_side=650)
+                        if img:
+                            st.image(img, caption=f"{tab_list[i]} — {lbl}", use_container_width=True)
+                        else:
+                            st.warning(f"Preview unavailable: {lbl}")
+
+        # Download Action Bar
+        dl_buttons = []
+        if mask_art and mask_art.file_path and Path(mask_art.file_path).exists():
+            dl_buttons.append(("Binary Mask (GeoTIFF)", mask_art.file_path, "image/tiff"))
+        if prob_art and prob_art.file_path and Path(prob_art.file_path).exists():
+            dl_buttons.append(("Probability Map (GeoTIFF)", prob_art.file_path, "image/tiff"))
+        if geojson_art and geojson_art.file_path and Path(geojson_art.file_path).exists():
+            dl_buttons.append(("Vector Regions (GeoJSON)", geojson_art.file_path, "application/geo+json"))
+        if regions_art and regions_art.file_path and Path(regions_art.file_path).exists():
+            dl_buttons.append(("Cluster Overlay (PNG)", regions_art.file_path, "image/png"))
+        if lc_chart and lc_chart.file_path and Path(lc_chart.file_path).exists():
+            dl_buttons.append(("Land-Cover Chart (PNG)", lc_chart.file_path, "image/png"))
+
+        if dl_buttons:
+            st.markdown("##### 📥 Export Mission Products")
+            dl_cols = st.columns(len(dl_buttons) + 1)
+            for idx, (label, pth, mime) in enumerate(dl_buttons):
+                with dl_cols[idx]:
+                    with open(pth, "rb") as f_dl:
+                        st.download_button(
+                            f"⬇️ {label}",
+                            f_dl.read(),
+                            file_name=Path(pth).name,
+                            mime=mime,
+                            use_container_width=True,
+                        )
+            with dl_cols[-1]:
+                st.download_button(
+                    "⬇️ Intelligence Report (.txt)",
+                    result.result_text.encode("utf-8"),
+                    file_name="satquery_intelligence_report.txt",
+                    mime="text/plain",
+                    use_container_width=True,
+                )
+
+    # -------------------------------------------------------------------------
+    # TECHNICAL TELEMETRY & SYSTEM DRAWER (COLLAPSIBLE EXPANDERS)
+    # -------------------------------------------------------------------------
+    st.markdown("### 📊 Technical Intelligence & Execution Telemetry")
+
+    with st.expander("📑 Factual Natural Language Intelligence Report", expanded=True):
+        st.markdown(result.result_text)
+
+    with st.expander("🧠 Agent Execution Plan & Routing Details", expanded=False):
+        p_col1, p_col2 = st.columns(2)
+        with p_col1:
+            st.markdown(f"**Resolved Task:** `{plan.task}`")
+            st.markdown(f"**Thematic Domain:** `{plan.theme.value.upper()}`")
+            st.markdown(f"**Input Mode:** `{plan.input_mode.value}`")
+            st.markdown(f"**Required Inputs:** {', '.join(plan.required_inputs)}")
+        with p_col2:
+            st.markdown(f"**Selected Model(s):** {', '.join(plan.selected_models)}")
+            st.markdown(f"**Selected Tools:** {', '.join(plan.selected_tools)}")
+            if plan.blocked:
+                st.error(f"Execution Blocked: {plan.block_reason}")
+            else:
+                st.success("Plan Status: Compatible & Dispatched")
+
+    with st.expander("🎯 Calibrated Confidence & Signal Attribution", expanded=False):
+        c_col1, c_col2 = st.columns(2)
+        with c_col1:
+            st.markdown(f"**Confidence Level:** {result.confidence.display_text}")
+            st.markdown(f"**Source:** {result.confidence.source.upper()}")
+            st.markdown(f"**Method:** `{result.confidence.method or 'None'}`")
+        with c_col2:
+            st.markdown(f"**Rationale:** *{result.confidence.reason}*")
+            if result.confidence.signals_used:
+                st.markdown(f"**Signals Evaluated:** `{', '.join(result.confidence.signals_used)}`")
+
+    with st.expander("⚠️ Input & Spatial Uncertainty Analysis", expanded=False):
         if result.uncertainties:
             for unc in result.uncertainties:
                 st.warning(f"⚠️ {unc}")
         else:
             st.success("No input data or spatial uncertainties detected.")
 
-    # 9. EXECUTION TRACE
-    st.header("9. Technical Execution Trace")
-    st.caption("Inspectable technical execution steps (duration, component, status). No internal chain-of-thought is exposed.")
-    trace_rows = []
-    for ev in result.trace:
-        icon = "✅" if ev.status.value == "success" else "⏳" if ev.status.value == "start" else "⚠️" if ev.status.value == "warn" else "❌"
-        trace_rows.append({
-            "Status": f"{icon} {ev.status.value.upper()}",
-            "Step": ev.step,
-            "Component": ev.component,
-            "Duration (ms)": f"{ev.duration_ms:.1f}" if ev.duration_ms is not None else "0.0",
-            "Timestamp": ev.timestamp,
-        })
-    st.dataframe(trace_rows, use_container_width=True)
+    with st.expander("⏱️ Chronological Execution Trace & Latency Breakdown", expanded=False):
+        trace_rows = []
+        for ev in result.trace:
+            icon = "✅" if ev.status.value == "success" else "⏳" if ev.status.value == "start" else "⚠️"
+            trace_rows.append({
+                "Status": f"{icon} {ev.status.value.upper()}",
+                "Step": ev.step,
+                "Component": ev.component,
+                "Duration (ms)": f"{ev.duration_ms:.1f}" if ev.duration_ms is not None else "0.0",
+                "Timestamp": ev.timestamp,
+            })
+        st.dataframe(trace_rows, use_container_width=True, hide_index=True)
 
 
-# -------------------------------------------------------------
-# 10. SESSION HISTORY
-# -------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# 4. CONVERSATIONAL SESSION HISTORY
+# -----------------------------------------------------------------------------
 if len(st.session_state.history) > 1:
-    st.divider()
-    st.header("10. Conversational Session History")
-    for turn in reversed(st.session_state.history[:-1]):
-        with st.expander(f"Previous Query: {turn['query']} ({turn['task']})"):
-            st.markdown(f"**Theme:** {turn['theme']}")
-            st.markdown(f"**Result:** {turn['result_text']}")
+    with st.expander("📜 Previous Analysis History in Current Session", expanded=False):
+        for idx, turn in enumerate(reversed(st.session_state.history[:-1]), 1):
+            st.markdown(f"**Turn {idx}:** \"{turn['query']}\" (`{turn['task']}`)")
+            st.caption(turn['result_text'][:250] + "..." if len(turn['result_text']) > 250 else turn['result_text'])
+            st.markdown("---")
