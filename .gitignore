@@ -33,6 +33,7 @@ build/
 # Generated data and outputs
 data/
 outputs/
+uploads/
 *.log
 
 # IDE and OS files

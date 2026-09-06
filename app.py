@@ -420,6 +420,13 @@ if result:
             with l_col4:
                 st.metric("Top Confidence", f"{result.confidence.score*100:.1f}%" if result.confidence.score is not None else "N/A")
 
+            if "top_5_predictions" in lc_data and lc_data["top_5_predictions"]:
+                st.markdown("##### 🏆 Top 5 Predicted Land-Cover Categories")
+                t5_cols = st.columns(len(lc_data["top_5_predictions"]))
+                for col, item in zip(t5_cols, lc_data["top_5_predictions"]):
+                    with col:
+                        st.metric(label=item["class"], value=f"{item['probability']*100:.1f}%")
+
     # 6. VISUAL EVIDENCE & ARTIFACTS
     st.header("6. Visual Evidence & Generated Artifacts")
 

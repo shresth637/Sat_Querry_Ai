@@ -87,6 +87,9 @@ class ResourceManager:
             )
             self.release_model(self._resident_large_model_id)
 
+        if model_id in self._resident_models and self._resident_models[model_id] is not adapter:
+            self.release_model(model_id)
+
         if model_id not in self._resident_models:
             if adapter.status != "ready":
                 adapter.load()

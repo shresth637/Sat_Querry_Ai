@@ -9,6 +9,7 @@ from satquery.domain.schemas import (
     InputMode,
     RasterMeta,
     SlotAssignment,
+    TaskType,
     ValidationStatus,
 )
 from satquery.evidence.builder import (
@@ -140,9 +141,24 @@ class AgentController:
                     + "\n".join(f"- {msg}" for msg in blocking_msgs)
                 )
             else:
-                # Find available ready or unloaded model adapters for this plan
-                available_adapters = [a for a in selected_adapters if a.status in ["ready", "unloaded"]]
-                unconfigured_models = [a.name for a in selected_adapters if a.status == "not_configured"]
+                # Find available ready or unloaded model adapters matching required capability for this plan
+                def _adapter_matches_task(adapter, task):
+                    if task == TaskType.OPTICAL_SAR_ANALYSIS.value:
+                        return "optical_sar_fusion" in adapter.capabilities
+                    if task == TaskType.BI_TEMPORAL_CHANGE.value:
+                        return "change_detect" in adapter.capabilities
+                    if task == TaskType.CLASSIFICATION.value:
+                        return "classification" in adapter.capabilities
+                    if task == TaskType.CHANGE_VQA.value:
+                        return "change_vqa" in adapter.capabilities
+                    return True
+
+                matching_adapters = [a for a in selected_adapters if _adapter_matches_task(a, plan.task)]
+                available_adapters = [a for a in matching_adapters if a.status in ["ready", "unloaded"]]
+                unconfigured_models = [
+                    a.name for a in selected_adapters
+                    if a.status == "not_configured" or not _adapter_matches_task(a, plan.task)
+                ]
 
                 active_adapter = None
                 if available_adapters:

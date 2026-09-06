@@ -58,15 +58,16 @@ models:
     notes: Specialist integration deferred.
 
   - id: bigearthnet_resnet50_s1s2
-    name: BigEarthNet v2 ResNet-50 S1+S2
+    name: BigEarthNet v2 ResNet-50 S2
     version: v0.2.0
-    capabilities: [optical_sar_fusion, land_cover, classification]
+    capabilities: [classification, land_cover]
     adapter: satquery.models.bigearthnet.BigEarthNetModel
-    enabled: false
-    weights_path: null
+    enabled: true
+    weights_path: models/checkpoints/resnet50_s2_v0.2.0.pth
     threshold: 0.3
-    rs_adapted: true
-    notes: M1 target. Not loaded until weights exist locally.
+    device: auto
+    notes: Pretrained on BigEarthNet v2.0 (reBEN) Sentinel-2 benchmark (19 Corine Land Cover classes).
+
 
 tools:
   - id: geotiff_reader
