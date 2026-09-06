@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SATQUERY AI — MISSION CONTROL & REMOTE SENSING ORCHESTRATOR
  * Connects 3D Orbital Globe, 3D Isometric Layer Decomposer,
  * 10-stage Telemetry Pipeline, Interactive Optical Split Scanner, and AgentController.
@@ -221,6 +221,7 @@ class SatQueryApp {
 
     const setPosition = (clientX) => {
       const rect = stage.getBoundingClientRect();
+      if (rect.width <= 0) return;
       let x = clientX - rect.left;
       x = Math.max(0, Math.min(rect.width, x));
       const pct = (x / rect.width) * 100;
@@ -228,6 +229,10 @@ class SatQueryApp {
       handle.style.left = `${pct}%`;
       t1Layer.style.clipPath = `polygon(${pct}% 0, 100% 0, 100% 100%, ${pct}% 100%)`;
     };
+
+    // Set initial 50% split position
+    handle.style.left = '50%';
+    t1Layer.style.clipPath = 'polygon(50% 0, 100% 0, 100% 100%, 50% 100%)';
 
     stage.addEventListener('mousedown', (e) => {
       isDown = true;
@@ -242,6 +247,23 @@ class SatQueryApp {
       if (!isDown) return;
       setPosition(e.clientX);
     });
+
+    // Touch support for mobile / tablets
+    stage.addEventListener('touchstart', (e) => {
+      if (e.touches && e.touches.length > 0) {
+        isDown = true;
+        setPosition(e.touches[0].clientX);
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', () => {
+      isDown = false;
+    });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!isDown || !e.touches || e.touches.length === 0) return;
+      setPosition(e.touches[0].clientX);
+    }, { passive: true });
 
     // Inspector readout on hover
     stage.addEventListener('mousemove', (e) => {

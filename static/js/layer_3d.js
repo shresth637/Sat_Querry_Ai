@@ -12,8 +12,8 @@ class Layer3DDecomposer {
     if (!this.canvas) return;
     this.ctx = this.canvas.getContext('2d');
 
-    this.width = this.canvas.clientWidth;
-    this.height = this.canvas.clientHeight;
+    this.width = 0;
+    this.height = 0;
 
     // Layer Separation Distance (pixels)
     this.separation = 85;
@@ -40,6 +40,7 @@ class Layer3DDecomposer {
     this.isDragging = false;
     this.lastX = 0;
     this.lastY = 0;
+    this.isActive = false;
 
     this.bindEvents();
     this.resize();
@@ -76,12 +77,19 @@ class Layer3DDecomposer {
   resize() {
     if (!this.canvas) return;
     const rect = this.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      this.width = 0;
+      this.height = 0;
+      return;
+    }
+
     this.width = rect.width;
     this.height = rect.height;
 
     const dpr = window.devicePixelRatio || 1;
-    this.canvas.width = this.width * dpr;
-    this.canvas.height = this.height * dpr;
+    this.canvas.width = Math.floor(this.width * dpr);
+    this.canvas.height = Math.floor(this.height * dpr);
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.scale(dpr, dpr);
   }
 
@@ -108,12 +116,16 @@ class Layer3DDecomposer {
 
   // Draw an isometric transformed plane in 3D
   drawIsometricPlane(img, zOffset, label, color, drawGrid = false) {
+    if (this.width <= 10 || this.height <= 10) return;
+
     const ctx = this.ctx;
     const cx = this.width / 2;
     const cy = this.height / 2 - zOffset;
 
     const planeW = Math.min(this.width, this.height) * 0.52;
     const planeH = planeW;
+
+    if (planeW <= 10) return;
 
     ctx.save();
     ctx.translate(cx, cy);
@@ -123,9 +135,6 @@ class Layer3DDecomposer {
     const sinY = Math.sin(this.yaw);
     const cosP = Math.cos(this.pitch);
 
-    // 2D affine transform simulating 3D rotation:
-    // x' = x * cosY - y * sinY
-    // y' = (x * sinY + y * cosY) * sin(pitch)
     const a = cosY;
     const b = sinY * cosP;
     const c = -sinY;
@@ -145,7 +154,7 @@ class Layer3DDecomposer {
     ctx.shadowBlur = 0;
 
     // Fill Image
-    if (img && img.complete) {
+    if (img && img.complete && img.naturalWidth > 0) {
       ctx.globalAlpha = this.opacity;
       ctx.drawImage(img, -hw, -hh, planeW, planeH);
     } else {
@@ -153,29 +162,31 @@ class Layer3DDecomposer {
       ctx.fillRect(-hw, -hh, planeW, planeH);
     }
 
-    // Grid wireframe overlay
+    // Grid wireframe overlay (with strictly guarded step size)
     if (drawGrid) {
       ctx.strokeStyle = 'rgba(0, 240, 255, 0.2)';
       ctx.lineWidth = 1;
-      const step = planeW / 8;
-      for (let x = -hw; x <= hw; x += step) {
-        ctx.beginPath();
-        ctx.moveTo(x, -hh);
-        ctx.lineTo(x, hh);
-        ctx.stroke();
-      }
-      for (let y = -hh; y <= hh; y += step) {
-        ctx.beginPath();
-        ctx.moveTo(-hw, y);
-        ctx.lineTo(hw, y);
-        ctx.stroke();
+      const step = Math.max(20, Math.floor(planeW / 8));
+      if (step > 0) {
+        for (let x = -hw; x <= hw; x += step) {
+          ctx.beginPath();
+          ctx.moveTo(x, -hh);
+          ctx.lineTo(x, hh);
+          ctx.stroke();
+        }
+        for (let y = -hh; y <= hh; y += step) {
+          ctx.beginPath();
+          ctx.moveTo(-hw, y);
+          ctx.lineTo(hw, y);
+          ctx.stroke();
+        }
       }
     }
 
     // Border corner brackets
     ctx.strokeStyle = '#fff';
-    ctx.lineWidth = 3;
-    const cl = 14;
+    ctx.lineWidth = 2;
+    const cl = Math.min(14, hw * 0.2);
     // Top-Left
     ctx.beginPath(); ctx.moveTo(-hw, -hh + cl); ctx.lineTo(-hw, -hh); ctx.lineTo(-hw + cl, -hh); ctx.stroke();
     // Top-Right
@@ -190,22 +201,22 @@ class Layer3DDecomposer {
     // Draw Monospace Label beside plane
     ctx.font = '10px "JetBrains Mono", monospace';
     ctx.fillStyle = color;
-    ctx.fillText(`[ ${label} ]`, cx - planeW * 0.45, cy + planeH * 0.35);
+    ctx.fillText(`[ ${label} ]`, Math.max(10, cx - planeW * 0.45), cy + planeH * 0.35);
   }
 
   drawSeparationGuides() {
+    if (this.width <= 10 || this.height <= 10) return;
+
     const ctx = this.ctx;
     const cx = this.width / 2;
     const cy = this.height / 2;
     const sep = this.separation;
 
-    // Connecting dashed vertical pillar lines at the four plane corners
     ctx.strokeStyle = 'rgba(0, 240, 255, 0.25)';
     ctx.setLineDash([4, 4]);
     ctx.lineWidth = 1;
 
     const offset = Math.min(this.width, this.height) * 0.28;
-    // Four corner pillars
     const corners = [
       { x: cx - offset, y: cy },
       { x: cx + offset, y: cy },
@@ -226,6 +237,16 @@ class Layer3DDecomposer {
   animate() {
     requestAnimationFrame(() => this.animate());
 
+    // If canvas is hidden or has 0 dimensions, skip rendering completely
+    if (!this.canvas || this.canvas.offsetParent === null || this.canvas.clientWidth <= 0) {
+      return;
+    }
+
+    if (this.width <= 0 || this.height <= 0) {
+      this.resize();
+      if (this.width <= 0) return;
+    }
+
     this.pitch += (this.targetPitch - this.pitch) * 0.1;
     this.yaw += (this.targetYaw - this.yaw) * 0.1;
     this.separation += (this.targetSeparation - this.separation) * 0.1;
@@ -235,17 +256,14 @@ class Layer3DDecomposer {
     this.drawSeparationGuides();
 
     // Draw from bottom to top in Z order
-    // 1. Layer 0 (Bottom): T0 Baseline
     if (this.showT0) {
       this.drawIsometricPlane(this.imgT0, -this.separation, "L1: T0 BASELINE ORTHOPHOTO", "#38bdf8", true);
     }
 
-    // 2. Layer 1 (Middle): Neural Difference / Probability
     if (this.showDiff) {
       this.drawIsometricPlane(this.imgDiff, 0, "L2: NEURAL DIFFERENCE PROBABILITY", "#ff2a6d", false);
     }
 
-    // 3. Layer 2 (Top): T1 Resurvey
     if (this.showT1) {
       this.drawIsometricPlane(this.imgT1, this.separation, "L3: T1 RESURVEY ORTHOMOSAIC", "#00ff9d", true);
     }

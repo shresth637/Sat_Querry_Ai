@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SATQUERY AI — 3D ORBITAL GLOBE & SENSOR SIMULATOR
  * High-performance native WebGL/Canvas3D Earth Observation Simulation.
  * Renders textured Earth sphere, latitude/longitude graticules, satellite orbit,
@@ -135,12 +135,15 @@ class OrbitalGlobe {
   resize() {
     if (!this.canvas) return;
     const rect = this.canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
     this.width = rect.width;
     this.height = rect.height;
     
     const dpr = window.devicePixelRatio || 1;
-    this.canvas.width = this.width * dpr;
-    this.canvas.height = this.height * dpr;
+    this.canvas.width = Math.floor(this.width * dpr);
+    this.canvas.height = Math.floor(this.height * dpr);
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.scale(dpr, dpr);
     
     this.radius = Math.min(this.width, this.height) * 0.38;
@@ -392,6 +395,11 @@ class OrbitalGlobe {
 
   animate() {
     requestAnimationFrame(() => this.animate());
+
+    if (!this.canvas || this.width <= 10 || this.height <= 10) {
+      this.resize();
+      return;
+    }
 
     // Smooth spherical damping to target rotations
     this.rotX += (this.targetRotX - this.rotX) * 0.05;
