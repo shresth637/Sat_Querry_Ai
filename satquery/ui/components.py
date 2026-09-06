@@ -11,28 +11,19 @@ import html
 
 def render_header(cuda_available: bool = False, active_model_count: int = 2) -> str:
     """Render compact mission-control navbar with live status telemetry."""
-    hw_text = "NVIDIA CUDA" if cuda_available else "CPU ENGINE"
-    hw_icon = "⚡" if cuda_available else "💻"
-    
     return f"""
     <div class="sat-navbar">
         <div class="sat-brand">
             <div class="sat-brand-icon">🛰️</div>
             <div>
                 <div class="sat-brand-title">SATQUERY AI</div>
-                <div class="sat-brand-subtitle">Satellite Intelligence Platform</div>
+                <div class="sat-brand-subtitle">SATELLITE INTELLIGENCE PLATFORM</div>
             </div>
         </div>
         <div class="sat-nav-telemetry">
             <div class="sat-status-badge">
                 <span class="sat-status-ping"></span>
-                <span>System Online</span>
-            </div>
-            <div class="sat-hw-pill">
-                <span>{hw_icon} {hw_text}</span>
-            </div>
-            <div class="sat-hw-pill">
-                <span>🛰️ {active_model_count} Models Ready</span>
+                <span>SYSTEM ONLINE</span>
             </div>
         </div>
     </div>
@@ -44,22 +35,21 @@ def render_hero() -> str:
     return """
     <div class="sat-hero">
         <div class="sat-hero-header">
-            <div class="sat-hero-tag">🛰️ Autonomous Earth Observation & Remote Sensing Intelligence</div>
+            <div class="sat-hero-tag">🛰️ Autonomous Earth Observation & Remote Sensing</div>
             <div class="sat-card-badge">MISSION CONTROL v4.2</div>
         </div>
         <div class="sat-hero-headline">ASK. ANALYZE. UNDERSTAND EARTH.</div>
         <div class="sat-hero-sub">
-            Natural-language intelligence for satellite imagery — bi-temporal change detection, 
-            multispectral land-cover classification, and sub-pixel spatial analytics.
+            Natural-language intelligence for satellite imagery.
         </div>
         <div class="sat-mission-steps">
-            <div class="sat-step-node"><span>01</span> DATA SOURCE</div>
+            <div class="sat-step-node"><span>01</span>&nbsp;&nbsp;DATA SOURCE</div>
             <div class="sat-step-arrow">➔</div>
-            <div class="sat-step-node"><span>02</span> ASK SATQUERY AI</div>
+            <div class="sat-step-node"><span>02</span>&nbsp;&nbsp;ASK SATQUERY AI</div>
             <div class="sat-step-arrow">➔</div>
-            <div class="sat-step-node"><span>03</span> AI ROUTING</div>
+            <div class="sat-step-node"><span>03</span>&nbsp;&nbsp;AI ROUTING</div>
             <div class="sat-step-arrow">➔</div>
-            <div class="sat-step-node"><span>04</span> MISSION PRODUCTS</div>
+            <div class="sat-step-node"><span>04</span>&nbsp;&nbsp;MISSION PRODUCTS</div>
         </div>
     </div>
     """
@@ -85,32 +75,32 @@ def render_pipeline_flow(
     return f"""
     <div class="pipeline-flow">
         <div class="flow-node completed">
-            <div class="flow-step-num">✓ STAGE 01 • INTENT</div>
-            <div class="flow-step-name">Query Interpreted</div>
+            <div class="flow-step-num">✓ QUERY</div>
+            <div class="flow-step-name">Natural Language Query</div>
             <div class="flow-step-detail">"{safe_q}"</div>
         </div>
         <div class="flow-connector">➔</div>
         <div class="flow-node completed">
-            <div class="flow-step-num">✓ STAGE 02 • ROUTER</div>
+            <div class="flow-step-num">✓ AI ROUTER</div>
             <div class="flow-step-name">Query Router</div>
             <div class="flow-step-detail">{task}</div>
         </div>
         <div class="flow-connector">➔</div>
         <div class="flow-node active">
-            <div class="flow-step-num">◉ STAGE 03 • SPECIALIST</div>
+            <div class="flow-step-num">◉ SPECIALIST MODEL</div>
             <div class="flow-step-name">{model_name}</div>
             <div class="flow-step-detail">model: {model_id}</div>
         </div>
         <div class="flow-connector">➔</div>
         <div class="flow-node completed">
-            <div class="flow-step-num">✓ STAGE 04 • SPATIAL ENGINE</div>
+            <div class="flow-step-num">✓ SPATIAL ENGINE</div>
             <div class="flow-step-name">Spatial Intelligence</div>
             <div class="flow-step-detail">{tools_summary}</div>
         </div>
         <div class="flow-connector">➔</div>
         <div class="flow-node completed">
-            <div class="flow-step-num">✓ STAGE 05 • PRODUCTS</div>
-            <div class="flow-step-name">Mission Products</div>
+            <div class="flow-step-num">✓ MISSION PRODUCTS</div>
+            <div class="flow-step-name">Geospatial Products</div>
             <div class="flow-step-detail">{outputs_summary}</div>
         </div>
     </div>

@@ -697,17 +697,54 @@ button[kind="secondary"]:hover {
 }
 
 /* File Uploader */
-[data-testid="stFileUploader"] {
-    background: rgba(13, 19, 33, 0.55) !important;
-    border: 1px dashed rgba(56, 189, 248, 0.3) !important;
-    border-radius: 10px !important;
-    padding: 0.85rem !important;
-    transition: all 0.2s ease !important;
+/* File Uploader & Dropzone Containers */
+.upload-card {
+    background: rgba(13, 19, 33, 0.6);
+    border: 1px dashed rgba(56, 189, 248, 0.35);
+    border-radius: 12px;
+    padding: 0.9rem;
+    text-align: center;
+    transition: all 0.22s ease;
+    margin-bottom: 0.6rem;
 }
 
-[data-testid="stFileUploader"]:hover {
+.upload-card:hover {
+    border-color: var(--sat-cyan);
+    background: rgba(14, 165, 233, 0.08);
+    box-shadow: 0 0 16px rgba(0, 229, 255, 0.12);
+}
+
+.upload-card-title {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: var(--sat-cyan);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+}
+
+.upload-card-sub {
+    font-size: 0.72rem;
+    color: var(--sat-text-muted);
+    font-family: var(--sat-font-mono);
+    margin-bottom: 0.45rem;
+}
+
+[data-testid="stFileUploader"] {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+}
+
+[data-testid="stFileUploader"] section {
+    background: rgba(10, 16, 30, 0.5) !important;
+    border: 1px dashed rgba(56, 189, 248, 0.25) !important;
+    border-radius: 8px !important;
+    padding: 0.5rem !important;
+}
+
+[data-testid="stFileUploader"] section:hover {
     border-color: var(--sat-cyan) !important;
-    background: rgba(14, 165, 233, 0.08) !important;
 }
 
 /* Tabs */

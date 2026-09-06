@@ -82,26 +82,11 @@ st.markdown(
 st.markdown(render_hero(), unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# SIDEBAR: ADVANCED TELEMETRY & CACHE
+# SIDEBAR: MINIMAL QUICK ACTIONS
 # -----------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("### ⚙️ Mission Telemetry")
-    device_name = "NVIDIA CUDA" if cuda_avail else "CPU Fallback Engine"
-    st.markdown(f"**Execution Hardware:** `{device_name}`")
-    if cuda_avail:
-        vram = rm.get_vram_info()
-        st.caption(f"Allocated: {vram.get('allocated_mb', 0):.0f} MB / Total: {vram.get('total_mb', 0):.0f} MB")
-    else:
-        st.caption("Host CPU execution active. Low memory overhead.")
-
-    st.markdown("---")
-    st.markdown("### 🛰️ Specialist Models")
-    for mid, adapter in reg.list_models():
-        st_icon = "🟢" if adapter.status == "ready" else "🟡" if adapter.status == "unloaded" else "⚪"
-        st.markdown(f"{st_icon} **{adapter.name}** (`{mid}`)")
-        st.caption(f"Status: {adapter.status.upper()} | Caps: {', '.join(adapter.capabilities)}")
-
-    st.markdown("---")
+    st.markdown("### 🛰️ SatQuery AI")
+    st.caption("Autonomous Earth Observation & Multimodal Satellite Intelligence")
     if st.button("🗑️ Reset Session Cache", use_container_width=True):
         st.session_state.history.clear()
         st.session_state.last_result = None
@@ -111,14 +96,14 @@ with st.sidebar:
 
 
 # -----------------------------------------------------------------------------
-# 01. DATA SOURCE (COMBINED ELEGANT WORKFLOW & INGESTION)
+# 01. DATA SOURCE (WORKFLOW & INGESTION)
 # -----------------------------------------------------------------------------
 st.markdown(
     """
     <div class="sat-card">
         <div class="sat-card-header">
-            <div class="sat-card-title"><span>📡</span> 01 &nbsp;DATA SOURCE &mdash; Choose Earth Observation Workflow</div>
-            <div class="sat-card-badge">INPUT SENSORS</div>
+            <div class="sat-card-title"><span>📡</span> 01 &nbsp;&nbsp;DATA SOURCE</div>
+            <div class="sat-card-badge">CHOOSE WORKFLOW</div>
         </div>
     """,
     unsafe_allow_html=True,
@@ -127,9 +112,9 @@ st.markdown(
 mode_selection = st.radio(
     "Choose your Earth observation workflow:",
     [
-        "🔄 Bi-Temporal Change (Open-CD BIT)",
-        "📷 Single Image (BigEarthNet Land-Cover / Scene VQA)",
-        "📡 Optical + SAR Multimodal",
+        "🔄 BI-TEMPORAL CHANGE",
+        "📷 SINGLE IMAGE",
+        "📡 OPTICAL + SAR",
     ],
     horizontal=True,
     label_visibility="collapsed",
@@ -139,12 +124,20 @@ slots: list[SlotAssignment] = []
 slot_files: dict[str, Path] = {}
 analysis_kwargs = {}
 
-if "Single Image" in mode_selection:
+if "SINGLE IMAGE" in mode_selection:
     input_mode = InputMode.I1_SINGLE_OPTICAL
     col_upload, col_params = st.columns([1.8, 1.2])
 
     with col_upload:
-        st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-bottom:0.25rem;'>📥 Ingest Scene (Sentinel-2, Landsat, GeoTIFF)</div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="upload-card">
+                <div class="upload-card-title">📷 SATELLITE SCENE</div>
+                <div class="upload-card-sub">DROP IMAGE &bull; GeoTIFF / TIFF</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         single_upload = st.file_uploader(
             "Drop Satellite Scene (GeoTIFF / TIFF):",
             type=["tif", "tiff", "geotiff"],
@@ -157,7 +150,7 @@ if "Single Image" in mode_selection:
             slot_files["image"] = p
 
     with col_params:
-        st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.25rem;'>⚙️ Classification Threshold</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-size:0.75rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.35rem;'>⚙️ Classification Confidence Cutoff</div>", unsafe_allow_html=True)
         classification_threshold = st.slider(
             "Confidence Cutoff:",
             min_value=0.05,
@@ -165,16 +158,25 @@ if "Single Image" in mode_selection:
             value=0.10,
             step=0.05,
             help="Minimum class probability to report in BigEarthNet scene classification (default: 0.10).",
+            label_visibility="collapsed",
         )
         analysis_kwargs["threshold"] = classification_threshold
-        st.caption("• Pretrained on BigEarthNet v2.0 (reBEN) Sentinel-2 19 Corine Land Cover categories")
+        st.caption("• Pretrained on BigEarthNet v2.0 (reBEN) Sentinel-2 19 Corine categories")
 
-elif "Bi-Temporal Change" in mode_selection:
+elif "BI-TEMPORAL CHANGE" in mode_selection:
     input_mode = InputMode.I4_BITEMPORAL_PAIR
     col_t0, col_t1 = st.columns(2)
 
     with col_t0:
-        st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-bottom:0.25rem;'>⏳ T0 &mdash; Baseline Scene (Before)</div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="upload-card">
+                <div class="upload-card-title">⏳ T0 / BEFORE</div>
+                <div class="upload-card-sub">DROP BASELINE SCENE &bull; GeoTIFF / TIFF</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         t0_upload = st.file_uploader(
             "Upload Date T0 (GeoTIFF / TIFF):",
             type=["tif", "tiff", "geotiff"],
@@ -187,7 +189,15 @@ elif "Bi-Temporal Change" in mode_selection:
             slot_files["t0"] = p0
 
     with col_t1:
-        st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-bottom:0.25rem;'>⌛ T1 &mdash; Resurvey Scene (After)</div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="upload-card">
+                <div class="upload-card-title">⌛ T1 / AFTER</div>
+                <div class="upload-card-sub">DROP RESURVEY SCENE &bull; GeoTIFF / TIFF</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         t1_upload = st.file_uploader(
             "Upload Date T1 (GeoTIFF / TIFF):",
             type=["tif", "tiff", "geotiff"],
@@ -232,7 +242,15 @@ else:  # Optical + SAR Multimodal
     input_mode = InputMode.I3_OPTICAL_SAR_PAIR
     col_opt, col_sar = st.columns(2)
     with col_opt:
-        st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-bottom:0.25rem;'>🌈 Optical / Multispectral Sensor</div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="upload-card">
+                <div class="upload-card-title">🌈 OPTICAL / MULTISPECTRAL</div>
+                <div class="upload-card-sub">DROP OPTICAL IMAGE &bull; GeoTIFF / TIFF</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         opt_upload = st.file_uploader(
             "Upload Optical Image:",
             type=["tif", "tiff", "geotiff"],
@@ -245,7 +263,15 @@ else:  # Optical + SAR Multimodal
             slot_files["optical"] = p_opt
 
     with col_sar:
-        st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-bottom:0.25rem;'>🛰️ Synthetic Aperture Radar (SAR)</div>", unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="upload-card">
+                <div class="upload-card-title">🛰️ SYNTHETIC APERTURE RADAR (SAR)</div>
+                <div class="upload-card-sub">DROP RADAR IMAGE &bull; GeoTIFF / TIFF</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         sar_upload = st.file_uploader(
             "Upload SAR Radar Image:",
             type=["tif", "tiff", "geotiff"],
@@ -263,22 +289,52 @@ st.markdown("</div>", unsafe_allow_html=True)
 # -----------------------------------------------------------------------------
 # LIVE INPUT STATE & SENSOR TELEMETRY
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# LIVE INPUT STATE & SENSOR TELEMETRY
+# -----------------------------------------------------------------------------
 # Determine readiness state
 input_is_ready = False
-if "Bi-Temporal Change" in mode_selection:
+if "BI-TEMPORAL CHANGE" in mode_selection:
     t0_ready = "t0" in slot_files
     t1_ready = "t1" in slot_files
     input_is_ready = t0_ready and t1_ready
-    status_tag = "● ANALYSIS READY" if input_is_ready else "○ WAITING FOR IMAGERY"
-    badge_cls = "ready" if input_is_ready else "waiting"
-elif "Single Image" in mode_selection:
+    if input_is_ready and st.session_state.current_query.strip():
+        status_tag = "● ANALYSIS READY"
+        badge_cls = "ready"
+    elif t0_ready and t1_ready:
+        status_tag = "● T0 READY &bull; ● T1 READY"
+        badge_cls = "ready"
+    elif t0_ready:
+        status_tag = "● T0 READY &bull; ○ WAITING FOR T1"
+        badge_cls = "waiting"
+    elif t1_ready:
+        status_tag = "○ WAITING FOR T0 &bull; ● T1 READY"
+        badge_cls = "waiting"
+    else:
+        status_tag = "○ WAITING FOR IMAGERY"
+        badge_cls = "waiting"
+elif "SINGLE IMAGE" in mode_selection:
     input_is_ready = "image" in slot_files
-    status_tag = "● ANALYSIS READY" if input_is_ready else "○ WAITING FOR IMAGERY"
-    badge_cls = "ready" if input_is_ready else "waiting"
+    if input_is_ready and st.session_state.current_query.strip():
+        status_tag = "● ANALYSIS READY"
+        badge_cls = "ready"
+    elif input_is_ready:
+        status_tag = "● IMAGE READY"
+        badge_cls = "ready"
+    else:
+        status_tag = "○ WAITING FOR IMAGERY"
+        badge_cls = "waiting"
 else:
     input_is_ready = "optical" in slot_files and "sar" in slot_files
-    status_tag = "● ANALYSIS READY" if input_is_ready else "○ WAITING FOR IMAGERY"
-    badge_cls = "ready" if input_is_ready else "waiting"
+    if input_is_ready and st.session_state.current_query.strip():
+        status_tag = "● ANALYSIS READY"
+        badge_cls = "ready"
+    elif input_is_ready:
+        status_tag = "● OPTICAL & SAR READY"
+        badge_cls = "ready"
+    else:
+        status_tag = "○ WAITING FOR IMAGERY"
+        badge_cls = "waiting"
 
 if slots:
     st.markdown(
@@ -331,7 +387,7 @@ st.markdown(
     """
     <div class="sat-card">
         <div class="sat-card-header">
-            <div class="sat-card-title"><span>🧠</span> 02 &nbsp;ASK SATQUERY AI &mdash; What do you want to discover?</div>
+            <div class="sat-card-title"><span>🧠</span> 02 &nbsp;&nbsp;ASK SATQUERY AI &mdash; What do you want to discover?</div>
             <div class="sat-card-badge">NATURAL LANGUAGE INTELLIGENCE</div>
         </div>
     """,
@@ -339,7 +395,7 @@ st.markdown(
 )
 
 # Interactive Suggestion Chips
-if "Single Image" in mode_selection:
+if "SINGLE IMAGE" in mode_selection:
     chip_col1, chip_col2, chip_col3, chip_col4 = st.columns(4)
     with chip_col1:
         if st.button("🌿 Classify Land Cover", key="chip_lc", use_container_width=True):
@@ -479,7 +535,10 @@ if result:
                 """
                 <div class="sat-card">
                     <div class="sat-card-header">
-                        <div class="sat-card-title"><span>🛰️</span> Bi-Temporal Change Detection Metrics</div>
+                        <div>
+                            <div class="sat-card-title"><span>🛰️</span> BI-TEMPORAL CHANGE DETECTION</div>
+                            <div style="font-size:0.75rem; color:#94a3b8; margin-top:0.2rem;">AI-powered comparison of satellite observations</div>
+                        </div>
                         <div class="sat-card-badge">OPEN-CD BIT RESNET-18</div>
                     </div>
                 """,
@@ -499,48 +558,47 @@ if result:
                     "hint": "Ratio of changed pixels",
                 },
                 {
-                    "label": "Change Clusters",
+                    "label": "Change Regions",
                     "value": f"{s_data.get('regions_count', 0):,}",
-                    "hint": "Polygonized regions",
+                    "hint": "Polygonized clusters",
                 },
                 {
-                    "label": "AI Confidence",
+                    "label": "Confidence",
                     "value": f"{result.confidence.score*100:.1f}%" if result.confidence.score is not None else "N/A",
                     "hint": result.confidence.method or "Calibrated",
                 },
                 {
                     "label": "Processing Time",
                     "value": f"{s_data.get('timings_seconds', {}).get('total', 0.0):.2f}s",
-                    "hint": "Tiled inference + polygonization",
+                    "hint": "Tiled inference + vectorization",
                 },
             ]
             st.markdown(render_telemetry_hud(hud_metrics), unsafe_allow_html=True)
 
-            # 3-Column Comparative Board
-            st.markdown("##### 📷 Comparative Geospatial Viewer (T0 Baseline vs T1 Target vs AI Change Vector)")
+            # 3-Column Comparative Board (BEFORE / AFTER / AI CHANGE MAP)
             col_b1, col_b2, col_b3 = st.columns(3)
 
             with col_b1:
-                st.markdown("<div style='font-size:0.78rem; font-weight:700; color:#38bdf8; text-transform:uppercase;'>Baseline (T0)</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:0.8rem; font-weight:800; color:#38bdf8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.3rem;'>BEFORE &bull; T0</div>", unsafe_allow_html=True)
                 if "t0" in slot_files and slot_files["t0"].exists():
                     img0, lbl0 = generate_preview_image(slot_files["t0"], max_side=500)
                     if img0:
-                        st.image(img0, caption=f"T0: {lbl0}", use_container_width=True)
+                        st.image(img0, caption=f"Baseline: {lbl0}", use_container_width=True)
 
             with col_b2:
-                st.markdown("<div style='font-size:0.78rem; font-weight:700; color:#38bdf8; text-transform:uppercase;'>Observation (T1)</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:0.8rem; font-weight:800; color:#38bdf8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.3rem;'>AFTER &bull; T1</div>", unsafe_allow_html=True)
                 if "t1" in slot_files and slot_files["t1"].exists():
                     img1, lbl1 = generate_preview_image(slot_files["t1"], max_side=500)
                     if img1:
-                        st.image(img1, caption=f"T1: {lbl1}", use_container_width=True)
+                        st.image(img1, caption=f"Resurvey: {lbl1}", use_container_width=True)
 
             with col_b3:
-                st.markdown("<div style='font-size:0.78rem; font-weight:700; color:#f43f5e; text-transform:uppercase;'>AI Detected Change Overlay</div>", unsafe_allow_html=True)
+                st.markdown("<div style='font-size:0.8rem; font-weight:800; color:#00e5ff; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.3rem;'>AI CHANGE MAP</div>", unsafe_allow_html=True)
                 target_art = vis_art or mask_art
                 if target_art and target_art.file_path and Path(target_art.file_path).exists():
                     img_ch, lbl_ch = generate_preview_image(Path(target_art.file_path), max_side=500)
                     if img_ch:
-                        st.image(img_ch, caption=f"Change Map: {lbl_ch}", use_container_width=True)
+                        st.image(img_ch, caption=f"Neural Overlay: {lbl_ch}", use_container_width=True)
 
             st.markdown("</div>", unsafe_allow_html=True)
 
@@ -552,11 +610,17 @@ if result:
 
         if lc_stats and lc_stats.data:
             lc_data = lc_stats.data
+            top_pred_cls = lc_data.get("top_5_predictions", [{}])[0].get("class", "N/A")
+            top_pred_prob = lc_data.get("top_5_predictions", [{}])[0].get("probability", 0.0)
+
             st.markdown(
                 """
                 <div class="sat-card">
                     <div class="sat-card-header">
-                        <div class="sat-card-title"><span>🌿</span> Land-Cover Classification Predictions</div>
+                        <div>
+                            <div class="sat-card-title"><span>🌿</span> LAND-COVER CLASSIFICATION</div>
+                            <div style="font-size:0.75rem; color:#94a3b8; margin-top:0.2rem;">Multispectral deep land-cover categorization</div>
+                        </div>
                         <div class="sat-card-badge">BIGEARTHNET V2 RESNET-50</div>
                     </div>
                 """,
@@ -566,9 +630,9 @@ if result:
             # Telemetry Metrics HUD
             lc_metrics = [
                 {
-                    "label": "Dominant Prediction",
-                    "value": lc_data.get("top_5_predictions", [{}])[0].get("class", "N/A"),
-                    "hint": f"Probability: {lc_data.get('top_5_predictions', [{}])[0].get('probability', 0)*100:.2f}%",
+                    "label": "DOMINANT PREDICTION",
+                    "value": top_pred_cls,
+                    "hint": f"Confidence: {top_pred_prob*100:.2f}%",
                 },
                 {
                     "label": "Detection Threshold",
@@ -581,16 +645,16 @@ if result:
                     "hint": "Corine categories met",
                 },
                 {
-                    "label": "Top Confidence",
+                    "label": "Confidence",
                     "value": f"{result.confidence.score*100:.1f}%" if result.confidence.score is not None else "N/A",
-                    "hint": "Sigmoid output layer max",
+                    "hint": "Calibrated score",
                 },
             ]
             st.markdown(render_telemetry_hud(lc_metrics), unsafe_allow_html=True)
 
             # Top 5 Predictions Animated Bars
             if "top_5_predictions" in lc_data and lc_data["top_5_predictions"]:
-                st.markdown("##### 🏆 Top 5 Predicted Land-Cover Categories")
+                st.markdown("<div style='font-size:0.82rem; font-weight:800; color:#38bdf8; text-transform:uppercase; letter-spacing:0.06em; margin-top:0.8rem; margin-bottom:0.4rem;'>TOP 5 PREDICTIONS</div>", unsafe_allow_html=True)
                 st.markdown(render_top5_bars(lc_data["top_5_predictions"]), unsafe_allow_html=True)
 
             # Top Classes Table & Chart
@@ -599,11 +663,11 @@ if result:
                 if lc_chart and lc_chart.file_path and Path(lc_chart.file_path).exists():
                     st.image(lc_chart.file_path, caption="Probability Distribution (Top Categories)", use_container_width=True)
             with col_tbl:
-                st.markdown("##### 📋 Detected Classes (>= Threshold)")
+                st.markdown("<div style='font-size:0.82rem; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:0.4rem;'>📋 Detected Classes (>= Threshold)</div>", unsafe_allow_html=True)
                 if lc_data.get("detected_classes"):
                     st.dataframe(
                         [
-                            {"Category": c["class"], "Predicted Confidence": f"{c['probability']*100:.2f}%"}
+                            {"Category": c["class"], "Confidence": f"{c['probability']*100:.2f}%"}
                             for c in lc_data["detected_classes"]
                         ],
                         use_container_width=True,
@@ -656,19 +720,21 @@ if result:
 
         # Download Action Bar
         dl_buttons = []
-        if mask_art and mask_art.file_path and Path(mask_art.file_path).exists():
-            dl_buttons.append(("Binary Mask (GeoTIFF)", mask_art.file_path, "image/tiff"))
-        if prob_art and prob_art.file_path and Path(prob_art.file_path).exists():
-            dl_buttons.append(("Probability Map (GeoTIFF)", prob_art.file_path, "image/tiff"))
         if geojson_art and geojson_art.file_path and Path(geojson_art.file_path).exists():
-            dl_buttons.append(("Vector Regions (GeoJSON)", geojson_art.file_path, "application/geo+json"))
-        if regions_art and regions_art.file_path and Path(regions_art.file_path).exists():
-            dl_buttons.append(("Cluster Overlay (PNG)", regions_art.file_path, "image/png"))
-        if lc_chart and lc_chart.file_path and Path(lc_chart.file_path).exists():
-            dl_buttons.append(("Land-Cover Chart (PNG)", lc_chart.file_path, "image/png"))
+            dl_buttons.append(("VIEW GEOJSON", geojson_art.file_path, "application/geo+json"))
+        if mask_art and mask_art.file_path and Path(mask_art.file_path).exists():
+            dl_buttons.append(("DOWNLOAD GEOTIFF", mask_art.file_path, "image/tiff"))
+        elif prob_art and prob_art.file_path and Path(prob_art.file_path).exists():
+            dl_buttons.append(("DOWNLOAD GEOTIFF", prob_art.file_path, "image/tiff"))
+        if vis_art and vis_art.file_path and Path(vis_art.file_path).exists():
+            dl_buttons.append(("DOWNLOAD PNG", vis_art.file_path, "image/png"))
+        elif regions_art and regions_art.file_path and Path(regions_art.file_path).exists():
+            dl_buttons.append(("DOWNLOAD PNG", regions_art.file_path, "image/png"))
+        elif lc_chart and lc_chart.file_path and Path(lc_chart.file_path).exists():
+            dl_buttons.append(("DOWNLOAD PNG", lc_chart.file_path, "image/png"))
 
         if dl_buttons:
-            st.markdown("##### 📥 Export Mission Products")
+            st.markdown("<div style='font-size:0.8rem; font-weight:800; color:#38bdf8; text-transform:uppercase; letter-spacing:0.06em; margin-top:0.8rem; margin-bottom:0.4rem;'>📥 MISSION PRODUCTS & EXPORT</div>", unsafe_allow_html=True)
             dl_cols = st.columns(len(dl_buttons) + 1)
             for idx, (label, pth, mime) in enumerate(dl_buttons):
                 with dl_cols[idx]:
@@ -682,7 +748,7 @@ if result:
                         )
             with dl_cols[-1]:
                 st.download_button(
-                    "⬇️ Intelligence Report (.txt)",
+                    "⬇️ DOWNLOAD REPORT",
                     result.result_text.encode("utf-8"),
                     file_name="satquery_intelligence_report.txt",
                     mime="text/plain",
@@ -692,12 +758,11 @@ if result:
     # -------------------------------------------------------------------------
     # TECHNICAL TELEMETRY & SYSTEM DRAWER (COLLAPSIBLE MISSION PANELS)
     # -------------------------------------------------------------------------
-    st.markdown("### 📊 Mission Telemetry & Deep Diagnostics")
+    st.markdown("### 📊 Mission Telemetry & Technical Intelligence")
 
-    with st.expander("▼ AI Execution & Intelligence Report", expanded=True):
+    with st.expander("▼ AI EXECUTION & ROUTING", expanded=False):
         st.markdown(result.result_text)
-
-    with st.expander("▼ Model Information & Routing Trace", expanded=False):
+        st.markdown("---")
         p_col1, p_col2 = st.columns(2)
         with p_col1:
             st.markdown(f"**Resolved Task:** `{plan.task}`")
@@ -712,7 +777,20 @@ if result:
             else:
                 st.success("Plan Status: Compatible & Dispatched")
 
-    with st.expander("▼ Confidence & Uncertainty", expanded=False):
+    with st.expander("▼ MODEL INFORMATION", expanded=False):
+        for mid, adapter in reg.list_models():
+            st_icon = "🟢" if adapter.status == "ready" else "🟡" if adapter.status == "unloaded" else "⚪"
+            st.markdown(f"{st_icon} **{adapter.name}** (`{mid}`)")
+            st.caption(f"Status: {adapter.status.upper()} | Capabilities: {', '.join(adapter.capabilities)}")
+
+    with st.expander("▼ RASTER METADATA", expanded=False):
+        val_ev = next((e for e in result.evidence if "Validation" in e.title or "Quality" in e.title), None)
+        if val_ev and val_ev.data:
+            st.json(val_ev.data)
+        else:
+            st.info("Input rasters verified: Valid geospatial georeferencing and spectral compatibility confirmed.")
+
+    with st.expander("▼ CONFIDENCE & UNCERTAINTY", expanded=False):
         c_col1, c_col2 = st.columns(2)
         with c_col1:
             st.markdown(f"**Confidence Level:** {result.confidence.display_text}")
@@ -727,14 +805,15 @@ if result:
             for unc in result.uncertainties:
                 st.warning(f"⚠️ {unc}")
 
-    with st.expander("▼ Raster Metadata & Spatial Verification", expanded=False):
-        val_ev = next((e for e in result.evidence if "Validation" in e.title or "Quality" in e.title), None)
-        if val_ev and val_ev.data:
-            st.json(val_ev.data)
+    with st.expander("▼ INPUT VALIDATION", expanded=False):
+        if result.validation.status == ValidationStatus.VALID:
+            st.success("✓ All ingested rasters passed geospatial format, band-count, and coordinate validation.")
         else:
-            st.info("Input rasters verified: Valid geospatial georeferencing and spectral compatibility confirmed.")
+            st.warning(f"Validation Status: {result.validation.status.value.upper()}")
+            for err in result.validation.errors:
+                st.error(f"• {err}")
 
-    with st.expander("▼ Input Validation & Chronological Trace", expanded=False):
+    with st.expander("▼ PROCESSING TRACE", expanded=False):
         trace_rows = []
         for ev in result.trace:
             icon = "✅" if ev.status.value == "success" else "⏳" if ev.status.value == "start" else "⚠️"
@@ -747,7 +826,21 @@ if result:
             })
         st.dataframe(trace_rows, use_container_width=True, hide_index=True)
 
-    with st.expander("▼ Limitations & Operational Constraints", expanded=False):
+    with st.expander("▼ SYSTEM & MODEL TELEMETRY", expanded=False):
+        s_col1, s_col2 = st.columns(2)
+        with s_col1:
+            device_name = "NVIDIA CUDA" if cuda_avail else "CPU Fallback Engine"
+            st.markdown(f"**Execution Hardware:** `{device_name}`")
+            if cuda_avail:
+                vram = rm.get_vram_info()
+                st.caption(f"Allocated: {vram.get('allocated_mb', 0):.0f} MB / Total: {vram.get('total_mb', 0):.0f} MB")
+            else:
+                st.caption("Host CPU execution active. Low memory overhead.")
+        with s_col2:
+            st.markdown(f"**Total Registered Models:** `{len(reg.list_models())}`")
+            st.markdown(f"**Active Operational Models:** `{ready_count}`")
+
+    with st.expander("▼ LIMITATIONS", expanded=False):
         st.markdown(
             """
             - **Optical Cloud Sensitivity:** Optical change detection and land-cover classification require cloud-free or shadow-masked scenes.
