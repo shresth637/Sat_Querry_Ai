@@ -1,0 +1,374 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SatQuery AI — Autonomous Earth Observation Intelligence</title>
+  <link rel="stylesheet" href="/static/css/cinematic.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- ====================================================================
+       TOP TELEMETRY HUD BAR
+       ==================================================================== -->
+  <header class="hud-header">
+    <div class="hud-brand">
+      <div class="brand-icon"></div>
+      <div>
+        <div class="brand-title">SatQuery AI</div>
+      </div>
+      <div class="brand-badge">ORBITAL COMMAND</div>
+    </div>
+
+    <div class="hud-telemetry">
+      <div class="telemetry-item">
+        <span class="telemetry-label">ALTITUDE</span>
+        <span class="telemetry-val">687.4 KM LEO</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">ORBIT SPEED</span>
+        <span class="telemetry-val">7.58 KM/S</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">TORCH DEVICE</span>
+        <span class="telemetry-val" id="device-val">CPU / PYTORCH</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">VRAM ALLOC</span>
+        <span class="telemetry-val" id="vram-val">-- / --</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">MODELS</span>
+        <span class="telemetry-val" id="models-count-val">3 LOADED</span>
+      </div>
+      <div class="telemetry-item">
+        <span class="telemetry-label">ACTIVE ADAPTER</span>
+        <span class="telemetry-val" id="active-model-val">STANDBY</span>
+      </div>
+    </div>
+
+    <div class="hud-actions">
+      <div class="status-badge">
+        <div class="status-dot"></div>
+        <span id="utc-clock">--:--:-- UTC</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ====================================================================
+       HERO: 3D ORBITAL SIMULATION STAGE
+       ==================================================================== -->
+  <section class="hero-orbital-stage">
+    <canvas id="orbital-canvas"></canvas>
+
+    <div class="orbital-hud-overlay">
+      <div class="orbital-target-box">
+        <div class="orbital-target-header">
+          <span>TARGET LOCK</span>
+          <span>NADIR 0°</span>
+        </div>
+        <div class="orbital-target-name" id="target-box-name">DUBAI METROPOLIS</div>
+        <div class="orbital-target-coords" id="target-box-coords">25.2048°N, 55.2708°E | EPSG:32640</div>
+        <div class="orbital-target-coords" style="color:var(--accent-cyan);" id="target-box-sensor">WORLDVIEW-3 / 0.5M GSD</div>
+      </div>
+
+      <div class="orbital-reticle"></div>
+
+      <div class="orbital-footer-telemetry">
+        <div class="telemetry-tag-group">
+          <div class="telemetry-chip">SWATH: <span>120.0 KM</span></div>
+          <div class="telemetry-chip">SUN ELEV: <span>48.6°</span></div>
+          <div class="telemetry-chip">RADIOMETRIC: <span>12-BIT OPTICAL</span></div>
+        </div>
+        <div class="camera-controls-hint">
+          [ DRAG TO ORBIT GLOBE / SCROLL TO ZOOM ]
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====================================================================
+       MAIN WORKSPACE
+       ==================================================================== -->
+  <main class="app-container">
+
+    <!-- 10-STAGE PIPELINE HUD -->
+    <section class="pipeline-hud">
+      <div class="section-header">
+        <div class="section-title">NEURAL AGENT EXECUTION PIPELINE (10 STAGES)</div>
+        <span class="chip-tag cyan">STRICT DETERMINISTIC ROUTING</span>
+      </div>
+      <div class="pipeline-track">
+        <div class="pipeline-node" id="pipe-node-1">
+          <div class="pipeline-step-num">STAGE 01</div>
+          <div class="pipeline-title">Inspect Inputs</div>
+          <div class="pipeline-duration">-- ms</div>
+        </div>
+        <div class="pipeline-divider">→</div>
+        <div class="pipeline-node" id="pipe-node-2">
+          <div class="pipeline-step-num">STAGE 02</div>
+          <div class="pipeline-title">Quality Assess</div>
+          <div class="pipeline-duration">-- ms</div>
+        </div>
+        <div class="pipeline-divider">→</div>
+        <div class="pipeline-node" id="pipe-node-3">
+          <div class="pipeline-step-num">STAGE 03</div>
+          <div class="pipeline-title">CRS Validate</div>
+          <div class="pipeline-duration">-- ms</div>
+        </div>
+        <div class="pipeline-divider">→</div>
+        <div class="pipeline-node" id="pipe-node-4">
+          <div class="pipeline-step-num">STAGE 04</div>
+          <div class="pipeline-title">Query Router</div>
+          <div class="pipeline-duration">-- ms</div>
+        </div>
+        <div class="pipeline-divider">→</div>
+        <div class="pipeline-node" id="pipe-node-5">
+          <div class="pipeline-step-num">STAGE 05</div>
+          <div class="pipeline-title">Select Model</div>
+          <div class="pipeline-duration">-- ms</div>
+        </div>
+        <div class="pipeline-divider">→</div>
+        <div class="pipeline-node" id="pipe-node-6">
+          <div class="pipeline-step-num">STAGE 06</div>
+          <div class="pipeline-title">Neural Inference</div>
+          <div class="pipeline-duration">-- ms</div>
+        </div>
+        <div class="pipeline-divider">→</div>
+        <div class="pipeline-node" id="pipe-node-7">
+          <div class="pipeline-step-num">STAGE 07</div>
+          <div class="pipeline-title">Integrate Evidence</div>
+          <div class="pipeline-duration">-- ms</div>
+        </div>
+        <div class="pipeline-divider">→</div>
+        <div class="pipeline-node" id="pipe-node-8">
+          <div class="pipeline-step-num">STAGE 08</div>
+          <div class="pipeline-title">Calibrate Conf</div>
+          <div class="pipeline-duration">-- ms</div>
+        </div>
+        <div class="pipeline-divider">→</div>
+        <div class="pipeline-node" id="pipe-node-9">
+          <div class="pipeline-step-num">STAGE 09</div>
+          <div class="pipeline-title">Polygonize</div>
+          <div class="pipeline-duration">-- ms</div>
+        </div>
+        <div class="pipeline-divider">→</div>
+        <div class="pipeline-node" id="pipe-node-10">
+          <div class="pipeline-step-num">STAGE 10</div>
+          <div class="pipeline-title">Export Artifacts</div>
+          <div class="pipeline-duration">-- ms</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MISSION CONTROL DATA DECK -->
+    <section class="deck-grid">
+      <!-- Left: Mission Scenarios & Upload -->
+      <div class="mission-panel">
+        <div class="section-title">AUTHENTIC RECON MISSIONS</div>
+
+        <div class="sample-cards-list" id="sample-cards-list">
+          <!-- Loaded dynamically via JS -->
+        </div>
+
+        <!-- Custom Upload Card -->
+        <div class="upload-card" id="custom-upload-card">
+          <div class="upload-title">+ UPLOAD CUSTOM SATELLITE RASTER</div>
+          <div class="upload-subtitle">GeoTIFF (.tif), PNG, JPEG (T0 & T1 Bi-Temporal Pairs)</div>
+          <input type="file" id="file-upload-input" multiple accept=".tif,.tiff,.png,.jpg,.jpeg" style="display:none;" />
+        </div>
+      </div>
+
+      <!-- Right: Tactical Query Deck -->
+      <div class="config-deck">
+        <div class="section-title">MISSION PARAMETERS & QUERY PROMPT</div>
+
+        <div class="form-row">
+          <div class="form-label">
+            <span>Natural Language Query & Reasoning Target</span>
+            <span>INTENT PARSER</span>
+          </div>
+          <input type="text" class="form-input" id="query-input" value="Detect new building footprints and urban infrastructure developments between T0 and T1" />
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px;">
+          <div class="form-row">
+            <div class="form-label">Task Specialist Mode</div>
+            <select class="form-input" id="task-select">
+              <option value="BI_TEMPORAL_CHANGE">Bi-Temporal Change Detection (Open-CD BIT)</option>
+              <option value="CLASSIFICATION">Multi-Class Land Cover (BigEarthNet v2)</option>
+              <option value="SINGLE_VQA">Geospatial Vision QA (GeoChat)</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-label">
+              <span>Change Decision Threshold</span>
+              <span id="threshold-val" class="slider-val">0.50</span>
+            </div>
+            <div class="slider-container">
+              <input type="range" class="range-slider" id="threshold-slider" min="0.10" max="0.95" step="0.05" value="0.50" />
+            </div>
+          </div>
+        </div>
+
+        <div class="action-bar">
+          <button class="btn-primary" id="btn-initiate-scan">
+            <span>[ INITIATE ORBITAL SCAN ]</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISUAL INSPECTION CONSOLE & ANALYTICS -->
+    <section class="console-container">
+      
+      <!-- Multi-Mode Visual Inspection Stage -->
+      <div class="view-card">
+        <div class="view-nav">
+          <button class="view-nav-btn active" data-mode="split">OPTICAL SPLIT CURTAIN</button>
+          <button class="view-nav-btn" data-mode="decomposer">3D LAYER DECOMPOSER</button>
+          <button class="view-nav-btn" data-mode="regions">DETECTED REGIONS MESH</button>
+          <button class="view-nav-btn" data-mode="heatmap">NEURAL HEATMAP</button>
+        </div>
+
+        <div class="viewer-stage">
+          <!-- Mode 1: Split Curtain Stage -->
+          <div class="split-curtain-container" id="split-stage">
+            <div class="laser-scan-line"></div>
+            
+            <div class="curtain-labels">
+              <span class="curtain-pill t0">T0 BASELINE (PRE-EVENT)</span>
+              <span class="curtain-pill" id="pixel-coords" style="color:var(--accent-cyan);">X: -- px, Y: -- px</span>
+              <span class="curtain-pill t1">T1 RESURVEY (POST-EVENT)</span>
+            </div>
+
+            <div class="split-img-layer split-img-t0">
+              <img id="t0-img" src="" alt="T0 Baseline" />
+            </div>
+
+            <div class="split-img-layer split-img-t1" id="t1-layer">
+              <img id="t1-img" src="" alt="T1 Resurvey" />
+            </div>
+
+            <!-- Overlay Layer (Heatmap or Regions) -->
+            <div class="split-overlay-layer">
+              <img id="overlay-img" src="" alt="Overlay Layer" style="display:none;" />
+            </div>
+
+            <div class="split-handle" id="split-handle" style="left:50%;">
+              <div class="split-handle-btn">⮂ ⮃</div>
+            </div>
+          </div>
+
+          <!-- Mode 2: 3D Exploded Layer Decomposer Stage -->
+          <div id="decomposer-stage" style="display:none; width:100%; height:100%; position:relative;">
+            <canvas id="decomposer-canvas"></canvas>
+            <div class="decomposer-controls">
+              <span>EXPLOSION SEPARATION:</span>
+              <input type="range" id="decomposer-sep-slider" min="20" max="180" step="5" value="85" style="flex:1; accent-color:var(--accent-cyan);" />
+              <span style="color:var(--text-dim);">[ DRAG TO ROTATE 3D STACK ]</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Aside: Metrics, Confidence, and Regions -->
+      <aside class="metrics-aside">
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+          <div class="stat-box highlight">
+            <div class="stat-label">DETECTED CHANGE AREA</div>
+            <div class="stat-number cyan" id="stat-area-m2">-- m²</div>
+            <div class="stat-sub">Georeferenced projection</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">CHANGED PIXELS</div>
+            <div class="stat-number crimson" id="stat-pixels">--</div>
+            <div class="stat-sub" id="stat-pct">--% of scene</div>
+          </div>
+        </div>
+
+        <!-- Confidence Meter -->
+        <div class="confidence-card">
+          <div class="section-header" style="margin-bottom:4px; padding-bottom:4px;">
+            <div class="stat-label">NEURAL CONFIDENCE CALIBRATION</div>
+            <span class="chip-tag cyan" id="confidence-band">HIGH</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:baseline;">
+            <span class="stat-number emerald" id="confidence-val">--%</span>
+            <span class="stat-sub" id="confidence-reason">Awaiting inference</span>
+          </div>
+          <div class="confidence-bar-bg">
+            <div class="confidence-bar-fill" id="confidence-bar-fill"></div>
+          </div>
+        </div>
+
+        <!-- Vector Region Inspector -->
+        <div class="regions-card">
+          <div class="section-header" style="margin-bottom:4px; padding-bottom:4px;">
+            <div class="stat-label">DETECTED CHANGE REGIONS <span id="regions-count" style="color:var(--accent-cyan);">(0)</span></div>
+          </div>
+          <div class="regions-table-container">
+            <table class="regions-table">
+              <thead>
+                <tr>
+                  <th>FEATURE</th>
+                  <th>SURFACE AREA</th>
+                  <th>CONFIDENCE</th>
+                </tr>
+              </thead>
+              <tbody id="regions-table-body">
+                <tr>
+                  <td colspan="3" style="text-align:center; color:#64748b; padding:16px;">
+                    Execute scan to extract vector features.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Download Vault -->
+        <div class="artifacts-vault">
+          <div class="stat-label">PRODUCTION GEOSPATIAL ARTIFACTS</div>
+          <div class="vault-grid" id="vault-links">
+            <span style="font-size:10px; color:#64748b; font-family:var(--font-mono); grid-column:span 2;">
+              Artifacts generated after analysis run.
+            </span>
+          </div>
+        </div>
+      </aside>
+
+    </section>
+
+    <!-- MISSION INTELLIGENCE REPORT & TELEMETRY TERMINAL -->
+    <section style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+      <div class="report-panel">
+        <div class="section-header">
+          <div class="section-title">AGENT REASONING & SUMMARY REPORT</div>
+        </div>
+        <div class="report-markdown" id="report-markdown-content">
+          <p style="color:#64748b; font-style:italic;">Select a mission and click [ INITIATE ORBITAL SCAN ] to generate full intelligence report.</p>
+        </div>
+      </div>
+
+      <div class="terminal-card">
+        <div class="section-header" style="margin-bottom:8px; padding-bottom:4px;">
+          <div class="section-title">RAW TELEMETRY TRACE (JSON)</div>
+        </div>
+        <pre id="terminal-log-content">// System standby. Awaiting telemetry stream...</pre>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Core Scripts -->
+  <script src="/static/js/orbital_globe.js"></script>
+  <script src="/static/js/layer_3d.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

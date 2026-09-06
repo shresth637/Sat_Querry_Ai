@@ -118,14 +118,26 @@ To run the benchmark utility:
 
 ---
 
-## Running the Application
+## Running the Applications
 
-### 1. Launch Streamlit Web UI
+### 1. Launch Cinematic 3D Web Experience (Interactive Orbital Command)
+```powershell
+.\.venv\Scripts\python.exe server.py
+```
+Open [http://localhost:8000](http://localhost:8000) in any browser to access the 3D Web Experience featuring:
+- **Interactive 3D Orbital Earth & Sensor Simulation**: Procedural WebGL globe with real-time continent graticules, polar satellite orbit, volumetric nadir sensor scanning beam, and smooth spherical camera targeting.
+- **Interactive Optical Split Curtain Scanner**: High-precision draggable before/after comparison with dynamic difference overlays and hover coordinate/likelihood inspector.
+- **3D Isometric Layer Decomposer**: Exploded 3D spatial stack showing T0 Baseline, Neural Probability Mesh, and T1 Resurvey with customizable explosion separation and pitch/yaw rotation.
+- **10-Stage Agent Execution Pipeline HUD**: Real-time visual tracking of all 10 AgentController execution phases with millisecond latency telemetry.
+- **Authentic Recon Missions**: Pre-loaded with Dubai Urban Expansion (0.5m GSD, EPSG:32640), Danube Hydrological Inundation (10m GSD, EPSG:4326), and Castile Agricultural Land-Cover (10m GSD).
+- **Custom Upload & Production Artifact Vault**: Upload arbitrary GeoTIFF/PNG rasters and download georeferenced binary masks, continuous probability maps, and RFC 7946 GeoJSON vectors.
+
+### 2. Launch Streamlit Web UI
 ```powershell
 .\.venv\Scripts\streamlit.exe run app.py
 ```
 
-### 2. Run Test Suite
+### 3. Run Test Suite
 ```powershell
 .\.venv\Scripts\pytest.exe -v
 ```
