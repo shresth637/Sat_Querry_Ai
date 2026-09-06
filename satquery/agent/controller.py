@@ -1,15 +1,17 @@
 from pathlib import Path
 from typing import Any, Optional
 
-from satquery.agent.router import route_query
+from satquery.agent.router import QueryPlanner, route_query
 from satquery.confidence.estimator import build_confidence_report
 from satquery.domain.schemas import (
+    AgentPlan,
     AnalysisResult,
     Evidence,
     InputMode,
     RasterMeta,
     SlotAssignment,
     TaskType,
+    ValidationReport,
     ValidationStatus,
 )
 from satquery.evidence.builder import (
@@ -39,9 +41,29 @@ class AgentController:
         self,
         model_registry: Optional[ModelRegistry] = None,
         tool_registry: Optional[ToolRegistry] = None,
+        planner: Optional[QueryPlanner] = None,
     ) -> None:
         self.model_registry = model_registry or ModelRegistry.from_yaml("config/models.yaml")
         self.tool_registry = tool_registry or ToolRegistry.default()
+        self.planner = planner or QueryPlanner()
+
+    def plan(
+        self,
+        query: str,
+        slots: list[SlotAssignment],
+        input_mode: InputMode,
+        metas: Optional[dict[str, RasterMeta]] = None,
+        validation: Optional[ValidationReport] = None,
+    ) -> AgentPlan:
+        """Route natural language query and input slots to an AgentPlan."""
+        return self.planner.plan(
+            query=query,
+            slots=slots,
+            input_mode=input_mode,
+            metas=metas,
+            validation=validation,
+        )
+
 
     def analyze(
         self,
@@ -106,13 +128,14 @@ class AgentController:
 
         # 4. Query interpretation and task selection
         with tracer.span(step="interpret_query", component="query_router", parameters={"query": query}):
-            plan = route_query(
+            plan = self.planner.plan(
                 query=query,
                 slots=slots,
                 metas=metas,
                 input_mode=input_mode,
                 validation=validation,
             )
+
 
         # 5. Model & tool resolution
         with tracer.span(step="select_specialists", component="registry"):

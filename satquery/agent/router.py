@@ -304,3 +304,25 @@ def route_query(
         block_reason=block_reason,
         theme=theme,
     )
+
+
+class QueryPlanner:
+    """Semantic query planner that routes queries and imagery configurations to an AgentPlan."""
+
+    def plan(
+        self,
+        query: str,
+        slots: list[SlotAssignment],
+        input_mode: InputMode,
+        metas: Optional[dict[str, RasterMeta]] = None,
+        validation: Optional[ValidationReport] = None,
+    ) -> AgentPlan:
+        """Route natural language query and input slots to an AgentPlan."""
+        return route_query(
+            query=query,
+            slots=slots,
+            metas=metas or {},
+            input_mode=input_mode,
+            validation=validation,
+        )
+

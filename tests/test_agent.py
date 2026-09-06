@@ -1,6 +1,6 @@
-﻿from pathlib import Path
+from pathlib import Path
 from satquery.agent.controller import AgentController
-from satquery.agent.router import classify_theme, route_query
+from satquery.agent.router import QueryPlanner, classify_theme, route_query
 from satquery.domain.schemas import (
     InputMode,
     Modality,
@@ -188,3 +188,41 @@ def test_13_agent_error_handling(corrupt_file: Path):
     assert res.validation.status == ValidationStatus.FAIL
     assert "Validation failed" in res.result_text
     assert len(res.uncertainties) > 0
+
+
+def test_14_agent_controller_planner_and_bitemporal_execution(optical_geotiff: Path):
+    """Regression test: AgentController.planner exists and handles bitemporal change detection queries."""
+    controller = AgentController()
+    assert hasattr(controller, "planner")
+    assert hasattr(controller, "plan")
+    assert isinstance(controller.planner, QueryPlanner)
+
+    slots = [
+        SlotAssignment(slot_id="t0", file_path=str(optical_geotiff)),
+        SlotAssignment(slot_id="t1", file_path=str(optical_geotiff)),
+    ]
+    query = "Compare these two satellite images and map significant changes."
+
+    # Verify planner.plan execution
+    preview_plan = controller.planner.plan(query=query, slots=slots, input_mode=InputMode.I4_BITEMPORAL_PAIR)
+    assert preview_plan.task == TaskType.BI_TEMPORAL_CHANGE.value
+    assert "opencd_bit_change" in preview_plan.selected_models
+    assert not preview_plan.blocked
+
+    # Verify controller.plan matches
+    direct_plan = controller.plan(query=query, slots=slots, input_mode=InputMode.I4_BITEMPORAL_PAIR)
+    assert direct_plan.task == preview_plan.task
+    assert direct_plan.selected_models == preview_plan.selected_models
+
+    # Verify end-to-end analyze execution through Open-CD BIT
+    res = controller.analyze(query, slots, InputMode.I4_BITEMPORAL_PAIR)
+    assert res.plan.task == TaskType.BI_TEMPORAL_CHANGE.value
+    assert "Open-CD BIT" in res.result_text
+    assert res.confidence.is_available is True
+    assert res.confidence.method == "bit_softmax_mean_confidence"
+    
+    evidence_titles = [e.title for e in res.evidence]
+    assert "Binary Change Mask (GeoTIFF)" in evidence_titles
+    assert "Change Map Visual Overlay" in evidence_titles
+    assert "Bi-Temporal Change Statistics" in evidence_titles
+

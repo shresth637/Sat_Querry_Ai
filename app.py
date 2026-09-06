@@ -465,8 +465,15 @@ if run_button:
                     slots=slots,
                     input_mode=input_mode,
                 )
-                spec_mname = preview_plan.selected_models[0] if preview_plan.selected_models else "Specialist Neural Model"
+                spec_mname = "Specialist Neural Model"
+                if preview_plan.selected_models:
+                    adapter = controller.model_registry.get(preview_plan.selected_models[0])
+                    if adapter and getattr(adapter, "name", None):
+                        spec_mname = adapter.name
+                    else:
+                        spec_mname = preview_plan.selected_models[0]
                 st.write(f"◉ SPECIALIST MODEL RUNNING: **{spec_mname}**")
+
                 
                 result: AnalysisResult = controller.analyze(
                     query=query_text.strip(),
