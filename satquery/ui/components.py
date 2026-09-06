@@ -43,20 +43,23 @@ def render_hero() -> str:
     """Render high-impact mission hero banner with 4-step workflow breadcrumbs."""
     return """
     <div class="sat-hero">
-        <div class="sat-hero-tag">Autonomous Earth Observation & Remote Sensing</div>
+        <div class="sat-hero-header">
+            <div class="sat-hero-tag">🛰️ Autonomous Earth Observation & Remote Sensing Intelligence</div>
+            <div class="sat-card-badge">MISSION CONTROL v4.2</div>
+        </div>
         <div class="sat-hero-headline">ASK. ANALYZE. UNDERSTAND EARTH.</div>
         <div class="sat-hero-sub">
             Natural-language intelligence for satellite imagery — bi-temporal change detection, 
             multispectral land-cover classification, and sub-pixel spatial analytics.
         </div>
         <div class="sat-mission-steps">
-            <div class="sat-step-node"><span>1</span> Ingest Imagery</div>
+            <div class="sat-step-node"><span>01</span> DATA SOURCE</div>
             <div class="sat-step-arrow">➔</div>
-            <div class="sat-step-node"><span>2</span> Natural Language Query</div>
+            <div class="sat-step-node"><span>02</span> ASK SATQUERY AI</div>
             <div class="sat-step-arrow">➔</div>
-            <div class="sat-step-node"><span>3</span> AI Specialist Routing</div>
+            <div class="sat-step-node"><span>03</span> AI ROUTING</div>
             <div class="sat-step-arrow">➔</div>
-            <div class="sat-step-node"><span>4</span> Geospatial Products</div>
+            <div class="sat-step-node"><span>04</span> MISSION PRODUCTS</div>
         </div>
     </div>
     """
@@ -81,32 +84,32 @@ def render_pipeline_flow(
 
     return f"""
     <div class="pipeline-flow">
-        <div class="flow-node active">
-            <div class="flow-step-num">Step 01 • Intent</div>
-            <div class="flow-step-name">Natural Language Query</div>
+        <div class="flow-node completed">
+            <div class="flow-step-num">✓ STAGE 01 • INTENT</div>
+            <div class="flow-step-name">Query Interpreted</div>
             <div class="flow-step-detail">"{safe_q}"</div>
         </div>
         <div class="flow-connector">➔</div>
-        <div class="flow-node active">
-            <div class="flow-step-num">Step 02 • Router</div>
+        <div class="flow-node completed">
+            <div class="flow-step-num">✓ STAGE 02 • ROUTER</div>
             <div class="flow-step-name">Query Router</div>
             <div class="flow-step-detail">{task}</div>
         </div>
         <div class="flow-connector">➔</div>
         <div class="flow-node active">
-            <div class="flow-step-num">Step 03 • Specialist</div>
+            <div class="flow-step-num">◉ STAGE 03 • SPECIALIST</div>
             <div class="flow-step-name">{model_name}</div>
-            <div class="flow-step-detail">id: {model_id}</div>
+            <div class="flow-step-detail">model: {model_id}</div>
         </div>
         <div class="flow-connector">➔</div>
-        <div class="flow-node active">
-            <div class="flow-step-num">Step 04 • Spatial Engine</div>
+        <div class="flow-node completed">
+            <div class="flow-step-num">✓ STAGE 04 • SPATIAL ENGINE</div>
             <div class="flow-step-name">Spatial Intelligence</div>
             <div class="flow-step-detail">{tools_summary}</div>
         </div>
         <div class="flow-connector">➔</div>
-        <div class="flow-node active">
-            <div class="flow-step-num">Step 05 • Delivery</div>
+        <div class="flow-node completed">
+            <div class="flow-step-num">✓ STAGE 05 • PRODUCTS</div>
             <div class="flow-step-name">Mission Products</div>
             <div class="flow-step-detail">{outputs_summary}</div>
         </div>
@@ -161,19 +164,20 @@ def render_telemetry_hud(metrics: list[dict[str, str]]) -> str:
     return f'<div class="sat-metrics-grid">{"".join(cards_html)}</div>'
 
 
-def render_file_badge(filename: str, meta: Any, modality_val: str = "Optical") -> str:
+def render_file_badge(filename: str, meta: Any, modality_val: str = "Optical", slot_label: str = "IMAGE READY") -> str:
     """Render clean file metadata pill with status indicator."""
     crs_str = meta.crs if meta and meta.crs else "Unprojected"
-    dim_str = f"{meta.width} × {meta.height}" if meta and meta.width else "Raster"
+    dim_str = f"{meta.width} × {meta.height} px" if meta and meta.width else "Raster"
     bands_str = f"{meta.band_count} Bands" if meta and meta.band_count else ""
 
     return f"""
-    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.9rem; background: rgba(20, 28, 48, 0.6); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; margin-bottom: 0.6rem;">
-        <div style="display: flex; align-items: center; gap: 0.6rem;">
-            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
-            <span style="font-weight: 700; color: #f8fafc; font-size: 0.85rem;">{html.escape(filename)}</span>
+    <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.55rem 0.85rem; background: rgba(18, 26, 46, 0.75); border: 1px solid rgba(16, 185, 129, 0.3); border-radius: 8px; margin-bottom: 0.55rem;">
+        <div style="display: flex; align-items: center; gap: 0.55rem;">
+            <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #10b981; box-shadow: 0 0 6px #10b981;"></span>
+            <span style="font-weight: 700; color: #34d399; font-size: 0.75rem; font-family: var(--sat-font-mono); letter-spacing: 0.05em;">● {html.escape(slot_label)}</span>
+            <span style="font-weight: 600; color: #f8fafc; font-size: 0.82rem; margin-left: 0.35rem;">{html.escape(filename)}</span>
         </div>
-        <div style="font-family: var(--sat-font-mono); font-size: 0.72rem; color: #94a3b8; display: flex; gap: 0.6rem;">
+        <div style="font-family: var(--sat-font-mono); font-size: 0.7rem; color: #94a3b8; display: flex; gap: 0.55rem;">
             <span>{dim_str}</span>
             <span>•</span>
             <span>{bands_str}</span>

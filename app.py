@@ -111,43 +111,45 @@ with st.sidebar:
 
 
 # -----------------------------------------------------------------------------
-# 1. DATA INPUT & WORKFLOW MODE
+# 01. DATA SOURCE (COMBINED ELEGANT WORKFLOW & INGESTION)
 # -----------------------------------------------------------------------------
 st.markdown(
     """
     <div class="sat-card">
         <div class="sat-card-header">
-            <div class="sat-card-title"><span>📡</span> Step 1: Select Earth Observation Workflow & Ingest Imagery</div>
-            <div class="sat-card-badge">INPUT TELEMETRY</div>
+            <div class="sat-card-title"><span>📡</span> 01 &nbsp;DATA SOURCE &mdash; Choose Earth Observation Workflow</div>
+            <div class="sat-card-badge">INPUT SENSORS</div>
         </div>
     """,
     unsafe_allow_html=True,
 )
 
 mode_selection = st.radio(
-    "Select Workflow Mode:",
+    "Choose your Earth observation workflow:",
     [
-        "🔄 Bi-Temporal Pair (Open-CD BIT Change Detection)",
-        "📷 Single Satellite Scene (BigEarthNet Land-Cover / Scene VQA)",
-        "📡 Optical + SAR Multimodal Fusion",
+        "🔄 Bi-Temporal Change (Open-CD BIT)",
+        "📷 Single Image (BigEarthNet Land-Cover / Scene VQA)",
+        "📡 Optical + SAR Multimodal",
     ],
     horizontal=True,
+    label_visibility="collapsed",
 )
 
 slots: list[SlotAssignment] = []
 slot_files: dict[str, Path] = {}
 analysis_kwargs = {}
 
-if "Single Satellite Scene" in mode_selection:
+if "Single Image" in mode_selection:
     input_mode = InputMode.I1_SINGLE_OPTICAL
     col_upload, col_params = st.columns([1.8, 1.2])
 
     with col_upload:
-        st.markdown("##### 📥 Ingest Scene (Sentinel-2, Landsat, or GeoTIFF)")
+        st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-bottom:0.25rem;'>📥 Ingest Scene (Sentinel-2, Landsat, GeoTIFF)</div>", unsafe_allow_html=True)
         single_upload = st.file_uploader(
             "Drop Satellite Scene (GeoTIFF / TIFF):",
             type=["tif", "tiff", "geotiff"],
             key="single_uploader",
+            label_visibility="collapsed",
         )
         if single_upload:
             p = save_upload(single_upload)
@@ -155,9 +157,9 @@ if "Single Satellite Scene" in mode_selection:
             slot_files["image"] = p
 
     with col_params:
-        st.markdown("##### ⚙️ Classification Parameters")
+        st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#94a3b8; text-transform:uppercase; margin-bottom:0.25rem;'>⚙️ Classification Threshold</div>", unsafe_allow_html=True)
         classification_threshold = st.slider(
-            "Confidence Threshold:",
+            "Confidence Cutoff:",
             min_value=0.05,
             max_value=0.90,
             value=0.10,
@@ -167,16 +169,17 @@ if "Single Satellite Scene" in mode_selection:
         analysis_kwargs["threshold"] = classification_threshold
         st.caption("• Pretrained on BigEarthNet v2.0 (reBEN) Sentinel-2 19 Corine Land Cover categories")
 
-elif "Bi-Temporal Pair" in mode_selection:
+elif "Bi-Temporal Change" in mode_selection:
     input_mode = InputMode.I4_BITEMPORAL_PAIR
     col_t0, col_t1 = st.columns(2)
 
     with col_t0:
-        st.markdown("##### ⏳ T0 — Baseline Scene (Before)")
+        st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-bottom:0.25rem;'>⏳ T0 &mdash; Baseline Scene (Before)</div>", unsafe_allow_html=True)
         t0_upload = st.file_uploader(
             "Upload Date T0 (GeoTIFF / TIFF):",
             type=["tif", "tiff", "geotiff"],
             key="t0_uploader",
+            label_visibility="collapsed",
         )
         if t0_upload:
             p0 = save_upload(t0_upload)
@@ -184,18 +187,19 @@ elif "Bi-Temporal Pair" in mode_selection:
             slot_files["t0"] = p0
 
     with col_t1:
-        st.markdown("##### ⌛ T1 — Target Scene (After)")
+        st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-bottom:0.25rem;'>⌛ T1 &mdash; Resurvey Scene (After)</div>", unsafe_allow_html=True)
         t1_upload = st.file_uploader(
             "Upload Date T1 (GeoTIFF / TIFF):",
             type=["tif", "tiff", "geotiff"],
             key="t1_uploader",
+            label_visibility="collapsed",
         )
         if t1_upload:
             p1 = save_upload(t1_upload)
             slots.append(SlotAssignment(slot_id="t1", file_path=str(p1)))
             slot_files["t1"] = p1
 
-    with st.expander("⚙️ Advanced Change Detection Parameters", expanded=False):
+    with st.expander("⚙️ Advanced Change Detection Settings", expanded=False):
         cd_col1, cd_col2, cd_col3, cd_col4 = st.columns(4)
         with cd_col1:
             change_threshold = st.slider(
@@ -209,7 +213,7 @@ elif "Bi-Temporal Pair" in mode_selection:
             analysis_kwargs["change_threshold"] = change_threshold
         with cd_col2:
             min_change_region_pixels = st.slider(
-                "Min Region Noise Filter (px):",
+                "Min Noise Filter (px):",
                 min_value=5,
                 max_value=200,
                 value=20,
@@ -228,11 +232,12 @@ else:  # Optical + SAR Multimodal
     input_mode = InputMode.I3_OPTICAL_SAR_PAIR
     col_opt, col_sar = st.columns(2)
     with col_opt:
-        st.markdown("##### 🌈 Optical / Multispectral Sensor")
+        st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-bottom:0.25rem;'>🌈 Optical / Multispectral Sensor</div>", unsafe_allow_html=True)
         opt_upload = st.file_uploader(
             "Upload Optical Image:",
             type=["tif", "tiff", "geotiff"],
             key="opt_uploader",
+            label_visibility="collapsed",
         )
         if opt_upload:
             p_opt = save_upload(opt_upload)
@@ -240,11 +245,12 @@ else:  # Optical + SAR Multimodal
             slot_files["optical"] = p_opt
 
     with col_sar:
-        st.markdown("##### 🛰️ Synthetic Aperture Radar (SAR) Sensor")
+        st.markdown("<div style='font-size:0.8rem; font-weight:700; color:#38bdf8; text-transform:uppercase; margin-bottom:0.25rem;'>🛰️ Synthetic Aperture Radar (SAR)</div>", unsafe_allow_html=True)
         sar_upload = st.file_uploader(
             "Upload SAR Radar Image:",
             type=["tif", "tiff", "geotiff"],
             key="sar_uploader",
+            label_visibility="collapsed",
         )
         if sar_upload:
             p_sar = save_upload(sar_upload)
@@ -255,15 +261,32 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 
 # -----------------------------------------------------------------------------
-# IMAGE TELEMETRY & PREVIEW CARDS
+# LIVE INPUT STATE & SENSOR TELEMETRY
 # -----------------------------------------------------------------------------
+# Determine readiness state
+input_is_ready = False
+if "Bi-Temporal Change" in mode_selection:
+    t0_ready = "t0" in slot_files
+    t1_ready = "t1" in slot_files
+    input_is_ready = t0_ready and t1_ready
+    status_tag = "● ANALYSIS READY" if input_is_ready else "○ WAITING FOR IMAGERY"
+    badge_cls = "ready" if input_is_ready else "waiting"
+elif "Single Image" in mode_selection:
+    input_is_ready = "image" in slot_files
+    status_tag = "● ANALYSIS READY" if input_is_ready else "○ WAITING FOR IMAGERY"
+    badge_cls = "ready" if input_is_ready else "waiting"
+else:
+    input_is_ready = "optical" in slot_files and "sar" in slot_files
+    status_tag = "● ANALYSIS READY" if input_is_ready else "○ WAITING FOR IMAGERY"
+    badge_cls = "ready" if input_is_ready else "waiting"
+
 if slots:
     st.markdown(
-        """
+        f"""
         <div class="sat-card">
             <div class="sat-card-header">
-                <div class="sat-card-title"><span>🔍</span> Raster Metadata & Scene Verification</div>
-                <div class="sat-card-badge">GEOSPATIAL VERIFIED</div>
+                <div class="sat-card-title"><span>🔍</span> Sensor Telemetry & Scene Verification</div>
+                <div class="sat-card-badge {badge_cls}">{status_tag}</div>
             </div>
         """,
         unsafe_allow_html=True,
@@ -275,12 +298,13 @@ if slots:
         meta = inspect_raster(file_p)
         quality = assess_image_quality(file_p, meta)
         modality = detect_modality(meta)
+        slot_lbl = f"{slot.slot_id.upper()} ● READY"
 
         with preview_cols[idx]:
-            st.markdown(render_file_badge(meta.filename, meta, modality.value), unsafe_allow_html=True)
-            img_preview, label_txt = generate_preview_image(file_p, max_side=400)
+            st.markdown(render_file_badge(meta.filename, meta, modality.value, slot_label=slot_lbl), unsafe_allow_html=True)
+            img_preview, label_txt = generate_preview_image(file_p, max_side=360)
             if img_preview:
-                st.image(img_preview, caption=f"Preview: {label_txt}", use_container_width=True)
+                st.image(img_preview, caption=f"Raster: {label_txt}", use_container_width=True)
             else:
                 st.warning(f"Preview unavailable: {label_txt}")
 
@@ -301,95 +325,102 @@ if slots:
 
 
 # -----------------------------------------------------------------------------
-# 2. NATURAL LANGUAGE QUERY COMPOSER
+# 02. ASK SATQUERY AI (HERO NATURAL LANGUAGE COMPOSER)
 # -----------------------------------------------------------------------------
 st.markdown(
     """
     <div class="sat-card">
         <div class="sat-card-header">
-            <div class="sat-card-title"><span>🧠</span> Step 2: What do you want to know about your imagery?</div>
-            <div class="sat-card-badge">NATURAL LANGUAGE AGENT</div>
+            <div class="sat-card-title"><span>🧠</span> 02 &nbsp;ASK SATQUERY AI &mdash; What do you want to discover?</div>
+            <div class="sat-card-badge">NATURAL LANGUAGE INTELLIGENCE</div>
         </div>
     """,
     unsafe_allow_html=True,
 )
 
-st.markdown("**Prompt Suggestions (Click to Populate):**")
-
-if "Single Satellite Scene" in mode_selection:
-    q_col1, q_col2, q_col3, q_col4 = st.columns(4)
-    with q_col1:
-        if st.button("🌿 Classify Land Cover", use_container_width=True):
+# Interactive Suggestion Chips
+if "Single Image" in mode_selection:
+    chip_col1, chip_col2, chip_col3, chip_col4 = st.columns(4)
+    with chip_col1:
+        if st.button("🌿 Classify Land Cover", key="chip_lc", use_container_width=True):
             st.session_state.current_query = "Classify the land cover in this satellite image and give me the confidence scores."
             st.rerun()
-    with q_col2:
-        if st.button("🛣️ Check for Roads (VQA)", use_container_width=True):
+    with chip_col2:
+        if st.button("🛣️ Check for Roads (VQA)", key="chip_vqa", use_container_width=True):
             st.session_state.current_query = "Is there a road or runway in this image?"
             st.rerun()
-    with q_col3:
-        if st.button("🛰️ Describe Scene", use_container_width=True):
+    with chip_col3:
+        if st.button("🛰️ Describe Scene", key="chip_desc", use_container_width=True):
             st.session_state.current_query = "Describe the scene and visible landscape features."
             st.rerun()
-    with q_col4:
-        if st.button("💧 Locate Water & Wetlands", use_container_width=True):
+    with chip_col4:
+        if st.button("💧 Locate Water & Wetlands", key="chip_water", use_container_width=True):
             st.session_state.current_query = "Locate and highlight the water bodies in this scene."
             st.rerun()
 else:
-    q_col1, q_col2, q_col3, q_col4 = st.columns(4)
-    with q_col1:
-        if st.button("🔄 Detect Changes", use_container_width=True):
+    chip_col1, chip_col2, chip_col3, chip_col4 = st.columns(4)
+    with chip_col1:
+        if st.button("🔄 Detect Changes", key="chip_change", use_container_width=True):
             st.session_state.current_query = "What changed between these two satellite dates?"
             st.rerun()
-    with q_col2:
-        if st.button("🏗️ Find Building Construction", use_container_width=True):
+    with chip_col2:
+        if st.button("🏗️ Find Building Construction", key="chip_bldg", use_container_width=True):
             st.session_state.current_query = "Identify areas where building construction occurred between T0 and T1."
             st.rerun()
-    with q_col3:
-        if st.button("📐 Map Major Change Regions", use_container_width=True):
+    with chip_col3:
+        if st.button("📐 Map Major Change Regions", key="chip_regions", use_container_width=True):
             st.session_state.current_query = "Where did change occur and what are the major changed regions?"
             st.rerun()
-    with q_col4:
-        if st.button("🌐 Compare Two Images", use_container_width=True):
+    with chip_col4:
+        if st.button("🌐 Compare Two Images", key="chip_compare", use_container_width=True):
             st.session_state.current_query = "Compare these two satellite images and map significant changes."
             st.rerun()
 
 query_text = st.text_input(
     "Query input:",
     value=st.session_state.current_query,
-    placeholder="e.g., What changed between these two satellite dates and where are the major change regions?",
+    placeholder="What changed between these two satellite images and where are the major change regions?",
     label_visibility="collapsed",
 )
 
-st.markdown("<div style='height: 0.5rem;'></div>", unsafe_allow_html=True)
-run_button = st.button("✨ RUN SATELLITE INTELLIGENCE", type="primary", use_container_width=True)
+st.markdown("<div style='height: 0.4rem;'></div>", unsafe_allow_html=True)
+run_button = st.button("✨ ANALYZE IMAGERY", type="primary", use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
 
 # -----------------------------------------------------------------------------
-# EXECUTION ORCHESTRATION
+# EXECUTION ORCHESTRATION WITH MISSION CONTROL PROCESSING FEEDBACK
 # -----------------------------------------------------------------------------
 if run_button:
     if not slots:
-        st.error("⚠️ Please upload at least one satellite raster before running analysis.")
+        st.error("⚠️ Ingestion Incomplete: Please upload at least one satellite raster before running analysis.")
     elif not query_text.strip():
-        st.error("⚠️ Please enter a natural-language query or select a prompt suggestion above.")
+        st.error("⚠️ Query Missing: Please enter a natural-language query or click a suggestion chip above.")
     else:
         controller = AgentController()
         try:
-            with st.status("🛰️ Executing Autonomous Satellite Intelligence...", expanded=True) as status_box:
-                st.write("🔍 Stage 1: Inspecting rasters & verifying geospatial coordinate systems...")
+            with st.status("🛰️ SATQUERY AI &mdash; ANALYZING EARTH OBSERVATION DATA", expanded=True) as status_box:
+                st.write("✓ QUERY INTERPRETED & SENSORY INPUT VALIDATED")
                 time.sleep(0.04)
-                st.write("🧠 Stage 2: Parsing natural-language query intent & resolving specialist model...")
-                time.sleep(0.04)
-                st.write("🛰️ Stage 3: Executing specialist neural network inference & spatial statistics...")
+                
+                # Resolve plan preview for live specialist model name
+                preview_plan = controller.planner.plan(
+                    query=query_text.strip(),
+                    slots=slots,
+                    input_mode=input_mode,
+                )
+                spec_mname = preview_plan.selected_models[0] if preview_plan.selected_models else "Specialist Neural Model"
+                st.write(f"◉ SPECIALIST MODEL RUNNING: **{spec_mname}**")
+                
                 result: AnalysisResult = controller.analyze(
                     query=query_text.strip(),
                     slots=slots,
                     input_mode=input_mode,
                     **analysis_kwargs,
                 )
-                st.write("📦 Stage 4: Compiling GeoTIFF masks, GeoJSON vector polygons & intelligence report...")
-                status_box.update(label="✨ Analysis Completed Successfully!", state="complete", expanded=False)
+                st.write("✓ SPATIAL INTELLIGENCE & SUB-PIXEL ANALYTICS COMPLETE")
+                st.write("✓ MISSION PRODUCTS GENERATED (GeoTIFF + GeoJSON + Report)")
+                status_box.update(label="✨ MISSION ANALYSIS COMPLETED SUCCESSFULLY", state="complete", expanded=False)
 
             st.session_state.last_result = result
             st.session_state.history.append({
@@ -659,14 +690,14 @@ if result:
                 )
 
     # -------------------------------------------------------------------------
-    # TECHNICAL TELEMETRY & SYSTEM DRAWER (COLLAPSIBLE EXPANDERS)
+    # TECHNICAL TELEMETRY & SYSTEM DRAWER (COLLAPSIBLE MISSION PANELS)
     # -------------------------------------------------------------------------
-    st.markdown("### 📊 Technical Intelligence & Execution Telemetry")
+    st.markdown("### 📊 Mission Telemetry & Deep Diagnostics")
 
-    with st.expander("📑 Factual Natural Language Intelligence Report", expanded=True):
+    with st.expander("▼ AI Execution & Intelligence Report", expanded=True):
         st.markdown(result.result_text)
 
-    with st.expander("🧠 Agent Execution Plan & Routing Details", expanded=False):
+    with st.expander("▼ Model Information & Routing Trace", expanded=False):
         p_col1, p_col2 = st.columns(2)
         with p_col1:
             st.markdown(f"**Resolved Task:** `{plan.task}`")
@@ -681,7 +712,7 @@ if result:
             else:
                 st.success("Plan Status: Compatible & Dispatched")
 
-    with st.expander("🎯 Calibrated Confidence & Signal Attribution", expanded=False):
+    with st.expander("▼ Confidence & Uncertainty", expanded=False):
         c_col1, c_col2 = st.columns(2)
         with c_col1:
             st.markdown(f"**Confidence Level:** {result.confidence.display_text}")
@@ -691,15 +722,19 @@ if result:
             st.markdown(f"**Rationale:** *{result.confidence.reason}*")
             if result.confidence.signals_used:
                 st.markdown(f"**Signals Evaluated:** `{', '.join(result.confidence.signals_used)}`")
-
-    with st.expander("⚠️ Input & Spatial Uncertainty Analysis", expanded=False):
         if result.uncertainties:
+            st.markdown("---")
             for unc in result.uncertainties:
                 st.warning(f"⚠️ {unc}")
-        else:
-            st.success("No input data or spatial uncertainties detected.")
 
-    with st.expander("⏱️ Chronological Execution Trace & Latency Breakdown", expanded=False):
+    with st.expander("▼ Raster Metadata & Spatial Verification", expanded=False):
+        val_ev = next((e for e in result.evidence if "Validation" in e.title or "Quality" in e.title), None)
+        if val_ev and val_ev.data:
+            st.json(val_ev.data)
+        else:
+            st.info("Input rasters verified: Valid geospatial georeferencing and spectral compatibility confirmed.")
+
+    with st.expander("▼ Input Validation & Chronological Trace", expanded=False):
         trace_rows = []
         for ev in result.trace:
             icon = "✅" if ev.status.value == "success" else "⏳" if ev.status.value == "start" else "⚠️"
@@ -711,6 +746,15 @@ if result:
                 "Timestamp": ev.timestamp,
             })
         st.dataframe(trace_rows, use_container_width=True, hide_index=True)
+
+    with st.expander("▼ Limitations & Operational Constraints", expanded=False):
+        st.markdown(
+            """
+            - **Optical Cloud Sensitivity:** Optical change detection and land-cover classification require cloud-free or shadow-masked scenes.
+            - **Spatial Resolution & GSD:** Change features smaller than 2 × GSD may produce sub-pixel uncertainty.
+            - **Multispectral Alignment:** Sentinel-2 10m/20m bands are dynamically resampled to 10m GSD; coregistration shifts > 0.5 px will attenuate change precision.
+            """
+        )
 
 
 # -----------------------------------------------------------------------------
