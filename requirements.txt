@@ -9,3 +9,4 @@ streamlit>=1.32
 torch>=2.2,<3
 torchvision>=0.17,<1
 pytest>=8.0
+mmengine
