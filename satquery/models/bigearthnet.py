@@ -84,7 +84,7 @@ class BigEarthNetModel(ModelAdapter):
             capabilities=["classification", "land_cover"],
             status="unloaded",
         )
-        self.weights_path = Path(weights_path) if weights_path else None
+        self.weights_path = Path(weights_path) if weights_path else DEFAULT_WEIGHTS_PATH
         self.threshold = float(threshold)
         self.device_str = device
         self.output_dir = Path(output_dir)
